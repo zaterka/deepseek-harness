@@ -19,7 +19,7 @@ harness 需要面向模型的 web 工具，但不能将模型约定绑定到某�
 Web 访问是一个一等能力 seam，遵循[能力 seam Agent Note](2026-06-13-capability-seams.zh.md)：
 
 1. `@deepseek-ai/dsh-web`（`packages/web/web`）拥有 `ctx.web`、提供方注册、提供方选择、共享的请求/结果词汇，以及 web 特有的错误。
-2. 提供方包实现具体后端并向 `ctx.web` 注册能力，例如 `@deepseek-ai/dsh-web-search-exa`、`@deepseek-ai/dsh-web-search-perplexity`、`@deepseek-ai/dsh-web-search-deepseek` 和 `@deepseek-ai/dsh-web-fetch-http`。
+2. 提供方包实现具体后端并向 `ctx.web` 注册能力，例如 `@deepseek-ai/dsh-web-search-exa`、`@deepseek-ai/dsh-web-search-perplexity`、`@deepseek-ai/dsh-web-search-deepseek`、`@deepseek-ai/dsh-web-search-duckduckgo` 和 `@deepseek-ai/dsh-web-fetch-http`。
 3. `@deepseek-ai/dsh-tool-web`（`packages/web/tool-web`）拥有面向模型的 `web_search` 和 `web_fetch` 工具 schema、提示词段落、参数校验、结果格式化，以及通过 `ctx.web` 实现的工具展示。
 
 提供方不注册工具。提供方注册能力。`dsh-tool-web` 是面向模型的名称、描述、提示词引导、JSON Schema、展示的唯一所有者。
@@ -49,6 +49,8 @@ Web 访问是一个一等能力 seam，遵循[能力 seam Agent Note](2026-06-13
                                                                                   implementation
                                                                  <--depends on--  @deepseek-ai/dsh-web-search-deepseek
                                                                                   implementation
+                                                                 <--depends on--  @deepseek-ai/dsh-web-search-duckduckgo
+                                                                                  implementation
                                                                  <--depends on--  @deepseek-ai/dsh-web-fetch-http
                                                                                   implementation
 ```
@@ -60,6 +62,7 @@ flowchart LR
   exa["@deepseek-ai/dsh-web-search-exa"] -->|registerSearchProvider| web["@deepseek-ai/dsh-web / ctx.web"]
   perplexity["@deepseek-ai/dsh-web-search-perplexity"] -->|registerSearchProvider| web
   deepseek["@deepseek-ai/dsh-web-search-deepseek"] -->|registerSearchProvider| web
+  duckduckgo["@deepseek-ai/dsh-web-search-duckduckgo"] -->|registerSearchProvider| web
   fetchLocal["@deepseek-ai/dsh-web-fetch-http"] -->|registerFetchProvider| web
   toolWeb["@deepseek-ai/dsh-tool-web"] -->|search/fetch| web
   toolWeb -->|ctx.tools.register| webSearch["tool: web_search"]
@@ -141,6 +144,9 @@ interface WebRuntime {
 
 - id: web-search-deepseek
   name: '@deepseek-ai/dsh-web-search-deepseek'
+
+- id: web-search-duckduckgo
+  name: '@deepseek-ai/dsh-web-search-duckduckgo'
 
 - id: web-fetch-http
   name: '@deepseek-ai/dsh-web-fetch-http'
@@ -280,7 +286,7 @@ SSRF/私有网络防护（阻断私有、回环、链路本地、多播及其他
 
 ## 测试
 
-每一层在自己的边界处固定：`dsh-web` 中的注册/选择/截断/abort 约定与 `WebError` 码；每个提供方基于录制的 fixture（测试前置数据）的请求/响应映射（Perplexity fixture 包含纯 URL 引用，以保持可选 source 字段的诚实性），加上每个真实提供方的自跳过带密钥冒烟测试；`web-fetch-http` 中的真实本地 HTTP 行为；`dsh-tool-web` 中通过真实工具注册表的启用驱动注册、结构化执行错误和结果格式化。一个真实 Loader 冒烟测试守护两种导出形状（[事故复盘（postmortem） 0001](../../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)）：`dsh-web` 是默认导出的服务，而提供方和 `tool-web` 是命名空间插件，误加 `export default` 会丢失 `inject`。
+每一层在自己的边界处固定：`dsh-web` 中的注册/选择/截断/abort 约定与 `WebError` 码；每个提供方基于录制的 fixture（测试前置数据）的请求/响应映射（Perplexity fixture 包含纯 URL 引用，以保持可选 source 字段的诚实性），加上每个 search 提供方的自跳过真实网络冒烟测试（需要密钥的提供方按密钥门控，后端会限流数据中心 IP 的按质询门控）；`web-fetch-http` 中的真实本地 HTTP 行为；`dsh-tool-web` 中通过真实工具注册表的启用驱动注册、结构化执行错误和结果格式化。一个真实 Loader 冒烟测试守护两种导出形状（[事故复盘（postmortem） 0001](../../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)）：`dsh-web` 是默认导出的服务，而提供方和 `tool-web` 是命名空间插件，误加 `export default` 会丢失 `inject`。
 
 ## 曾考虑的替代方案
 

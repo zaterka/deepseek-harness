@@ -3142,6 +3142,22 @@ export interface Config {
 
 来源：[`packages/web/web-search-deepseek/src/index.ts:46`](../packages/web/web-search-deepseek/src/index.ts)
 
+<a id="deepseek-aidsh-web-search-duckduckgo"></a>
+
+## `@deepseek-ai/dsh-web-search-duckduckgo`
+
+需要：`web`
+
+```ts config-catalog
+/** Plugin config (all optional — `apply` fills the constant default). */
+export interface Config {
+  /** Endpoint base; `/html/` is appended. Defaults to the public HTML search endpoint. */
+  baseURL?: string
+}
+```
+
+来源：[`packages/web/web-search-duckduckgo/src/index.ts:33`](../packages/web/web-search-duckduckgo/src/index.ts)
+
 <a id="deepseek-aidsh-web-search-exa"></a>
 
 ## `@deepseek-ai/dsh-web-search-exa`
