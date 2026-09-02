@@ -393,18 +393,25 @@
         thresholds: [3, 5, 8]
         argumentsPreviewChars: 500
 
-    # Every mode enables the stable model-facing web_search tool. DeepSeek search
-    # resolves the same DEEPSEEK_API_KEY credential the Models page manages for
-    # chat, at each search; its Messages endpoint is separate from the
-    # chat-completions endpoint, so it takes its own base-URL override. Fetch stays
-    # disabled and no fetch provider is mounted: that provider defers SSRF
-    # protection and the model would choose the request target. Search is a full
-    # auxiliary model request with server-side retrieval, so this shipped DeepSeek
-    # route gets 60s while the provider-neutral tool default remains 30s.
+    # Every mode enables the stable model-facing web_search tool, selectable
+    # through DSH_WEB_SEARCH_PROVIDER or the searchProvider row. The shipped
+    # default is the keyless DuckDuckGo provider (no credential required for
+    # search); DeepSeek search also stays mounted for deployments that prefer it
+    # or want official retrieval — it resolves the same DEEPSEEK_API_KEY
+    # credential the Models page manages for chat, at each search, and its
+    # Messages endpoint is separate from the chat-completions endpoint, so it
+    # takes its own base-URL override. Fetch stays disabled and no fetch provider
+    # is mounted: that provider defers SSRF protection and the model would choose
+    # the request target. Search is a full auxiliary model request with
+    # server-side retrieval, so the shipped DeepSeek route gets 60s while the
+    # provider-neutral tool default remains 30s.
     - id: web
       name: '@deepseek-ai/dsh-web'
       config:
-        searchProvider: deepseek-official
+        searchProvider: duckduckgo
+
+    - id: web-search-duckduckgo
+      name: '@deepseek-ai/dsh-web-search-duckduckgo'
 
     - id: web-search-deepseek
       name: '@deepseek-ai/dsh-web-search-deepseek'

@@ -22,7 +22,7 @@ This is an **implementation** package: it registers a provider into `ctx.web`, i
   name: '@deepseek-ai/dsh-web-search-duckduckgo'
 ```
 
-The provider is opt-in: the shipped base composition keeps `searchProvider: deepseek-official`, so selecting DuckDuckGo takes the provider row plus the `searchProvider` change (or `$DSH_WEB_SEARCH_PROVIDER=duckduckgo`).
+The provider is the shipped default: the base composition selects `searchProvider: duckduckgo` and mounts this row. DeepSeek search stays mounted alongside it, so a deployment that prefers official retrieval sets `searchProvider: deepseek-official` (or `$DSH_WEB_SEARCH_PROVIDER=deepseek-official`).
 
 ## Mapping
 

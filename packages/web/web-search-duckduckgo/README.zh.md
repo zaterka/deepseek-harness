@@ -22,7 +22,7 @@
   name: '@deepseek-ai/dsh-web-search-duckduckgo'
 ```
 
-该提供方为 opt-in：出厂基础组合保持 `searchProvider: deepseek-official`，因此选择 DuckDuckGo 需要提供方配置项加上 `searchProvider` 变更（或 `$DSH_WEB_SEARCH_PROVIDER=duckduckgo`）。
+该提供方为出厂默认：基础组合选择 `searchProvider: duckduckgo` 并挂载本行。DeepSeek 搜索仍随之挂载，因此偏好官方检索的部署可设置 `searchProvider: deepseek-official`（或 `$DSH_WEB_SEARCH_PROVIDER=deepseek-official`）。
 
 ## 映射
 

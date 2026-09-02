@@ -10,7 +10,7 @@ web seam 出厂的搜索后端都需要部署持有的凭证：DeepSeek 官方�
 
 ## 决策
 
-`@deepseek-ai/dsh-web-search-duckduckgo`（`packages/web/web-search-duckduckgo`）以 id `duckduckgo` 向 `ctx.web` 注册一个无密钥 `WebSearchProvider`，与其他搜索提供方采用相同的函数／命名空间插件形状。该包为 opt-in：出厂基础组合不变（[默认搜索决策](../feature/2026-07-31-web-default-search.zh.md)保持 `searchProvider: deepseek-official`），部署通过提供方配置项加上 `searchProvider: duckduckgo` 或 `$DSH_WEB_SEARCH_PROVIDER=duckduckgo` 选择 DuckDuckGo。
+`@deepseek-ai/dsh-web-search-duckduckgo`（`packages/web/web-search-duckduckgo`）以 id `duckduckgo` 向 `ctx.web` 注册一个无密钥 `WebSearchProvider`，与其他搜索提供方采用相同的函数／命名空间插件形状。本笔记撰写时该包为 opt-in：出厂基础组合不变（[默认搜索决策](../feature/2026-07-31-web-default-search.zh.md)保持 `searchProvider: deepseek-official`），部署通过提供方配置项加上 `searchProvider: duckduckgo` 或 `$DSH_WEB_SEARCH_PROVIDER=duckduckgo` 选择 DuckDuckGo。**本笔记的默认选择部分已被取代**：DuckDuckGo 现为出厂默认（[2026-09-02-web-search-default-duckduckgo](2026-09-02-web-search-default-duckduckgo.zh.md)），DeepSeek 搜索仍随之挂载。
 
 请求路径为 `POST <baseURL>/html/`（默认基址 `https://html.duckduckgo.com`），携带 `q` 表单体、诚实的 `deepseek-harness/<version>` user agent，并设置 `redirect: 'error'`。POST 是 DuckDuckGo 异常检测器会应答的形式：同一端点的 GET 形式在相同 user agent 下被质询为 HTTP 202 异常页面，而 POST 形式返回结果。
 

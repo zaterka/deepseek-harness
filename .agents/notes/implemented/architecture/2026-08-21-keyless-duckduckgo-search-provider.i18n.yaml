@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-21-keyless-duckduckgo-search-provider.md
-2026-08-21-keyless-duckduckgo-search-provider.md: a242ceaca249ceaff018ddd48d0926c30c68c2a9
-2026-08-21-keyless-duckduckgo-search-provider.zh.md: 8cfee7c82109c542ae05cd6ddbf758dc3f3fbfd8
+2026-08-21-keyless-duckduckgo-search-provider.md: 7674e27f81cabc2d3858b804fe39fd326cd67fcb
+2026-08-21-keyless-duckduckgo-search-provider.zh.md: 3eecca3358199e8cde51f0b4d6d39aa7d6333b7a
