@@ -66,6 +66,14 @@
         provider: deepseek-official
         model: deepseek-v4-flash
 
+    # Per-role model selection and per-component extra prompt context for the
+    # `dev-mode` preset's four-stage pipeline (see apps/cli/config/agent-presets/dev-mode).
+    # The registry lives here so its Settings page and RPC-independent
+    # `ctx.devModePipeline` read/write path stay available whether or not any
+    # session mounts that preset.
+    - id: dev-mode-pipeline
+      name: '@deepseek-ai/dsh-dev-mode-pipeline'
+
     - id: jobs
       name: '@deepseek-ai/dsh-jobs-local'
 

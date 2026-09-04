@@ -1,0 +1,232 @@
+# The `dev-mode` agent preset: Development Mode.
+#
+# A coding agent that runs a four-stage development pipeline for each task:
+#   1. Planner  - the agent interviews the developer on ambiguous or open
+#      requirements (ask_user_question), then writes a decision-complete plan
+#      to a Markdown file on disk.
+#   2. Plan review - a dedicated review subagent critiques the plan for gaps
+#      before any code is written.
+#   3. Coding orchestrator - after the developer approves the plan (the gate),
+#      the agent spawns implementation subagents to carry it out.
+#   4. Code review - a dedicated review subagent compares the generated code
+#      back against the original plan.
+#
+# The per-role MODELS and per-component PROMPT CONTEXT are configurable in
+# Settings > Development Mode. That settings page and the `ctx.devModePipeline`
+# registry it reads/writes (`@deepseek-ai/dsh-dev-mode-pipeline`) live in the
+# HOST composition (packages/bundle/base/cordis.patch.yml) so they are
+# available whether or not any session mounts this preset. This file
+# contributes only the model-facing tools that resolve that registry
+# (`@deepseek-ai/dsh-tool-dev-mode-pipeline`: devagent.get-model,
+# devagent.get-context, devagent.spawn) plus the persona and everything else a
+# full coding agent needs (shell, filesystem, jobs, skills, goals, plan mode,
+# delegation, web).
+#
+# Model-plan relationship: the planner and the coding orchestrator ARE this
+# agent, so they run on the session's currently selected model (changeable in
+# the composer or the /model popup). The pipeline's role subagents (plan
+# reviewer, implementation subagents, code reviewer) run on the models set on
+# the Development Mode settings page, defaulting to the session model when
+# unset.
+#
+# This file is an AGENT-PLANE composition, mounted once as a standing scope
+# every dev-mode session joins (see packages/preset/agent-presets). The host
+# composition (`base.cordis.yml` + `web.cordis.yml`) keeps the registries, the
+# sandbox and approval stack, persistence, and the model route. A service row
+# here MUST sit inside a group carrying an `isolate` realm or it publishes
+# into the process-global root realm and collides with another preset's
+# instance of the same plugin; `dsh-agent-presets` rejects that at mount.
+
+# ── identity ────────────────────────────────────────────────────────────────
+
+# The preset's own persona, shadowing the deployment default for this agent.
+# `{{model}}` and `{{cwd}}` resolve from the agent's own route and workspace.
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      You are a Development Mode coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+
+      For each task you run a four-stage pipeline, in order:
+      1. PLAN: resolve ambiguous or open requirements first. Use
+         ask_user_question to interview the developer about anything that is
+         not already decided or discoverable by inspection (scope, public API,
+         failure modes, shipping constraints). Do not ask about facts you can
+         find out yourself. Then explore the real repository and write a
+         decision-complete plan to a Markdown file on disk (for example
+         `PLAN.md`), stating the goal, success criteria, grouped changes by
+         subsystem, API/schema/data-flow changes, edge cases, failure modes,
+         tests, acceptance criteria, and explicit assumptions. At the start of
+         this stage, read your configured extra context with
+         devagent.get-context (component "planner") and fold any provided
+         context into your planning instructions.
+      2. PLAN REVIEW: critique the plan for gaps with a dedicated review
+         subagent. Call devagent.spawn with role "planReview" (it runs the
+         review subagent on the model and extra context configured on the
+         Development Mode settings page). Fold the returned recommendations
+         into the plan file when they are valid.
+      3. CODE (GATE): before writing any code, surface the approved plan to
+         the developer and STOP for approval. In this mode a conversational
+         go-ahead is not enough: wait for the developer to approve the plan
+         (imperative coding language in the task still means code it, but you
+         present the plan and its review first). After approval, act as the
+         coding orchestrator and spawn implementation subagents to carry out
+         each part of the plan with devagent.spawn, role "implement".
+      4. CODE REVIEW: after the implementation, compare the generated code
+         against the original plan with a dedicated review subagent. Call
+         devagent.spawn with role "codeReview". Fix legitimate gaps and
+         report the outcome.
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── shell ───────────────────────────────────────────────────────────────────
+
+- id: tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+  disabled: !!js process.platform === 'win32'
+
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: !!js process.platform !== 'win32'
+
+# ── filesystem ──────────────────────────────────────────────────────────────
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+# ── background jobs ────────────────────────────────────────────────────────
+
+- id: tool-jobs
+  name: '@deepseek-ai/dsh-tool-jobs'
+
+# ── skills ──────────────────────────────────────────────────────────────────
+
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+
+# ── goals ───────────────────────────────────────────────────────────────────
+
+- id: tool-goal
+  name: '@deepseek-ai/dsh-tool-goal'
+
+# ── plan mode ───────────────────────────────────────────────────────────────
+
+- id: planning
+  name: cordis:group
+  group: true
+  isolate:
+    planMode: true
+  config:
+    - id: plan-mode
+      name: '@deepseek-ai/dsh-plan-mode'
+      config:
+        section: |
+              You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+
+              Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+
+              The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
+
+# ── compaction ──────────────────────────────────────────────────────────────
+
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+
+    - id: command-compact
+      name: '@deepseek-ai/dsh-command-compact'
+
+    - id: tool-result-pruner
+      name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+      config:
+        thresholdChars: 8192
+        headChars: 4096
+        tailChars: 1024
+
+# ── delegation ──────────────────────────────────────────────────────────────
+
+# The `subagents` registry and its spawn/fork backends live in the HOST
+# composition. This preset contributes the delegation TOOLS, which resolve
+# that host registry. `tool-dev-mode-pipeline` also resolves the host registry
+# directly for its own devagent.spawn tool, using the per-role model set on the
+# Development Mode settings page.
+- id: delegation
+  name: cordis:group
+  group: true
+  isolate:
+    workflowEngine: true
+  config:
+    - id: tool-subagent-control
+      name: '@deepseek-ai/dsh-tool-subagent-control'
+
+    - id: tool-subagent-list-agents
+      name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+
+    - id: tool-subagent
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: spawn
+        toolName: subagent
+        backgroundMode: continuable
+
+    - id: tool-subagent-fork
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: fork
+        toolName: subagent_fork
+        backgroundMode: continuable
+
+    - id: workflow-worker-thread
+      name: '@deepseek-ai/dsh-workflow-worker-thread'
+      config:
+        provider: spawn
+
+    - id: tool-workflow
+      name: '@deepseek-ai/dsh-tool-workflow'
+
+    - id: tool-ralph
+      name: '@deepseek-ai/dsh-tool-ralph'
+      config:
+        subagentProvider: spawn
+        maxRounds: 64
+
+    # Development Mode's own pipeline tools: devagent.get-model,
+    # devagent.get-context, devagent.spawn. Spawns role subagents on the
+    # `spawn` provider registered above.
+    - id: tool-dev-mode-pipeline
+      name: '@deepseek-ai/dsh-tool-dev-mode-pipeline'
+      config:
+        provider: spawn
+
+# ── remaining model-facing rows ─────────────────────────────────────────────
+
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    allowParallelInProgress: true
+
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: false
+    searchTimeoutMs: 60000

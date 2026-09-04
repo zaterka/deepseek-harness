@@ -1,0 +1,46 @@
+# Agent Note: Development Mode pipeline (per-role models, per-component prompt context)
+
+Status: implemented
+
+English | [中文](2026-09-03-dev-mode-pipeline.zh.md)
+
+## Problem
+
+A team wants a coding agent that runs a fixed four-stage pipeline for every task — plan, plan-review, gated coding, code-review — with each of the plan-review, implementation, and code-review stages spawned as a subagent on its own configurable model, and with the option to inject team- or project-specific extra context into any of the four stages' prompts without editing the preset itself. No existing preset or plugin composes that pipeline, and nothing in the settings surface lets a deployment pick a model or add context per pipeline role.
+
+An earlier iteration of this feature was built as a session-local dynamic Cordis package (`cordis_define`/`cordis_run`) plus an authored preset under the user's `~/.dsh/.agent-presets/`. Both live only in the running process and the user's home directory: neither is part of the git-tracked application, so a process restart or a fresh clone loses them entirely, and nothing can be committed for a team to share.
+
+## Decision
+
+The pipeline ships as three ordinary workspace packages plus a preset, exactly the way `agent-default-model` already ships a per-deployment model default:
+
+- [`@deepseek-ai/dsh-dev-mode-pipeline`](../../../../packages/core/dev-mode-pipeline/README.md) (`ctx.devModePipeline`) owns the data: a settings namespace (`dev-mode-pipeline`) holding one `{ provider, model }` per spawnable role (`planReview`, `implement`, `codeReview`) and one extra-context string per pipeline component (those three roles plus `planner`, the main-agent stage). `modelFor(role, defaultModel)` resolves a role's model to the stored selection when both fields are set, otherwise to the supplied `agentDefaultModel` service's current selection — the same settings-layering pattern `installSettingsSection` already gives `agent-default-model`, reused rather than reinvented.
+- [`@deepseek-ai/dsh-tool-dev-mode-pipeline`](../../../../packages/subagent/tool-dev-mode-pipeline/README.md) is the agent-plane Consumer: three model-facing tools (`devagent.get-model`, `devagent.get-context`, `devagent.spawn`) that read `ctx.devModePipeline` and, for `devagent.spawn`, start one role subagent through a configured `ctx.subagents` provider with the role's resolved model and its extra context prepended to the prompt.
+- [`@deepseek-ai/dsh-client-ui-settings-dev-mode-pipeline`](../../../../packages/client/ui-settings-dev-mode-pipeline/README.md) registers one `settings.section` with two tabs — Models (a provider/model picker per role, sourced from the host-scoped `llm.models` catalog) and Prompts (each component's read-only baseline prompt beside an editable extra-context field) — bound to the same settings namespace through the shared `ctx.settingsScope` seam, the same way `ui-settings-models` binds its own namespace.
+- The `dev-mode` shipped preset (`apps/cli/config/agent-presets/dev-mode/`) supplies the four-stage persona and loads `tool-dev-mode-pipeline` beside the ordinary coding toolkit (shell, filesystem, jobs, skills, goals, plan mode, delegation, web) — the same shape as the `standard`/`code` presets.
+
+Host-plane split: `dev-mode-pipeline` mounts in the base bundle (`packages/bundle/base/cordis.patch.yml`) next to `agent-default-model`, so its settings and RPC-independent `ctx.devModePipeline` read/write path exist whether or not any session ever mounts the `dev-mode` preset — settings pages must not depend on a particular preset being active. `tool-dev-mode-pipeline` stays agent-plane, loaded only by the `dev-mode` preset, because the tools it registers are meaningless without that preset's persona directing the pipeline stages.
+
+The `planner` component's extra context cannot be prepended the way a spawned role's can, because the planner **is** the main agent, not something this plugin starts — there is no prompt to prepend to. Instead `devagent.get-context` exists for the main agent to call, and the `dev-mode` persona's PLAN stage explicitly calls it at the start of planning and folds the result in.
+
+## Alternatives considered
+
+**Keep the dynamic Cordis package + `~/.dsh/.agent-presets/` preset as the shipped form.** Rejected: neither survives a process restart or a fresh checkout, so nothing can be code-reviewed, versioned, or shared with a team — exactly the requirement that started this work.
+
+**One combined package instead of three.** Rejected: it repeats the mistake the repository's own capability-seam convention exists to prevent — a settings-owning service, a model-facing tool Consumer, and a browser settings page are three roles that evolve independently (a settings schema change should not force a tool-schema rebuild, and vice versa), so they follow `agent-default-model` / `tool-subagent` / `ui-settings-models`'s existing three-way split rather than inventing a new shape.
+
+**A custom Client→Host RPC for the settings page instead of the generic settings scope.** Rejected: `ctx.settings` (`@deepseek-ai/dsh-settings`) and its Client-side `ctx.settingsScope` mirror already solve namespace layering, redaction, revision-fenced writes, and pushed invalidation; a bespoke RPC would duplicate all of it for no new requirement the generic seam does not already meet.
+
+**Fold the planner's extra context into the preset's static persona text instead of a tool call.** Rejected: the persona is one fixed string compiled into the preset; there is no way for it to read a runtime settings value without a tool call, and the alternative — regenerating the preset file whenever the planner context changes — defeats the point of making it editable from Settings.
+
+## Consequences
+
+The pipeline, its per-role models, and its per-component extra context are ordinary git-tracked source: they build, typecheck, lint, and test like every other package, ship through the same bundles as `agent-default-model`, and survive restarts and fresh checkouts. A deployment that never loads the `dev-mode` preset still carries the (unused) `dev-mode-pipeline` settings namespace in the base bundle, exactly as it already carries `agent-default-model`'s. Adding a fifth pipeline stage or role means updating three packages' shared vocabulary (`DevModeComponent`/`DevModeRole` in the host package, mirrored as plain data in the client package's `pipeline-copy.ts` per the client-purity rule that a client package may not import a Host `@deepseek-ai/dsh-*` package) plus the preset persona — there is no single source of truth across the Host/Client boundary, the same tradeoff `ui-settings-models`'s `onboarding-copy.ts` already accepts for its own namespace literal.
+
+## Testing
+
+[`dev-mode-pipeline.spec.ts`](../../../../packages/core/dev-mode-pipeline/tests/dev-mode-pipeline.spec.ts) drives `DevModePipelineConfig` over a real in-memory `SettingsProvider`, covering the default-model fallback, a saved override, clearing an override, a hand-written partial settings section, provider detachment, and the no-settings-provider case — the same coverage shape as `agent-default-model.spec.ts`.
+
+[`tool-dev-mode-pipeline.spec.ts`](../../../../packages/subagent/tool-dev-mode-pipeline/tests/tool-dev-mode-pipeline.spec.ts) boots the real plugin body on a real `ToolRuntime` + `SubagentRuntime` + `DevModePipelineConfig`, with a package-local scripted subagent provider (extended with `startRejection`/`resultRejection`/`disposeRejection` hooks) standing in for the child boundary, and invokes each tool through `ctx.tools.execute`: model/context resolution and their unknown-role/component rejections, context prepended (and not prepended) to the spawn prompt, a non-completed stop reason surfacing without failing the tool call, and every `ctx.subagents.start`/`run.result`/`run.dispose` failure combination.
+
+[`apply.client.spec.ts`](../../../../packages/client/ui-settings-dev-mode-pipeline/tests/apply.client.spec.ts) proves slot registration, the locale-following nav label, HMR re-registration, and pushed-invalidation refresh, mirroring `ui-settings-models`' own `apply.client.spec.ts`. [`store.client.spec.ts`](../../../../packages/client/ui-settings-dev-mode-pipeline/tests/store.client.spec.ts) drives the page store over a real mirror-derived `SettingsScopeController` and a scripted `llm.models` face. [`components.client.spec.tsx`](../../../../packages/client/ui-settings-dev-mode-pipeline/tests/components.client.spec.tsx) renders the tabbed section over a stubbed settings scope, covering both tabs, every save path (success and failure, Error and non-Error rejections), and the read-only notice. [`pipeline-copy.client.spec.ts`](../../../../packages/client/ui-settings-dev-mode-pipeline/tests/pipeline-copy.client.spec.ts) exhaustively covers the malformed-wire-data decode branches. All three new packages hold 100% per-file coverage.

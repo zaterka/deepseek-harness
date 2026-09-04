@@ -732,6 +732,47 @@ roots(): Agent[]
 
 Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index.ts)
 
+<a id="ctxdevmodepipeline--devmodepipelineconfig"></a>
+
+### `ctx.devModePipeline` — `DevModePipelineConfig`
+
+Owns the Development Mode pipeline's per-role model selection and per-component extra context, independently of any Host or transport. A role with no stored provider/model defers to the session default model (AgentDefaultModelConfig), read live at each call.
+
+```ts cordis-catalog
+/**
+ * Resolve one role's model selection: the stored provider/model when both
+ * are set, otherwise the session's default model.
+ * @param role - the pipeline role to resolve.
+ * @param defaultModel - optional default-model service; absent falls back to an empty selection.
+ * @returns the resolved provider, model, and whether the default supplied it.
+ */
+modelFor(role: DevModeRole, defaultModel: AgentDefaultModelConfig | undefined): DevModeModelSelection
+
+/**
+ * Read one component's stored extra context.
+ * @param component - the pipeline component to read.
+ * @returns the stored context, or an empty string when none was set.
+ */
+contextFor(component: DevModeComponent): string
+
+/**
+ * Save one role's model selection. An empty provider or model clears the
+ * override, so the role reverts to the session default.
+ * @param role - the pipeline role to update.
+ * @param selection - the next provider/model, or empty strings to clear.
+ */
+async saveModel(role: DevModeRole, selection: DevModeRoleSettings): Promise<void>
+
+/**
+ * Save one component's extra context.
+ * @param component - the pipeline component to update.
+ * @param context - the next extra context text.
+ */
+async saveContext(component: DevModeComponent, context: string): Promise<void>
+```
+
+Source: [`packages/core/dev-mode-pipeline/src/index.ts`](../../packages/core/dev-mode-pipeline/src/index.ts)
+
 <a id="agent-events"></a>
 
 ### `agent/*` events
