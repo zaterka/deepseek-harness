@@ -42,6 +42,7 @@ const PiAiConfig = Schema.object({
   providers: Schema.dict(Schema.object({
     apiKeyEnv: Schema.string().role('credential-ref'),
     baseURL: Schema.string(),
+    awsProfile: Schema.string(),
     reasoning: Schema.union(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']),
     headers: Schema.dict(Schema.string()),
   })),
@@ -154,7 +155,7 @@ function scriptedFace(overrides: {
         providers: [
           { provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [], active: true },
           { provider: 'openai', displayName: 'openai', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'openai'], active: true },
-          { provider: 'anthropic', displayName: 'anthropic', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'anthropic'], active: false },
+          { provider: 'anthropic', displayName: 'anthropic', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'anthropic'], active: false, nativeAuthFields: ['awsProfile'] },
           { provider: 'zombie', displayName: 'zombie', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'zombie'], active: false },
           { provider: 'broken', displayName: 'broken', settingsNs: 'llm-pi-ai', settingsPath: ['nope', 'x'], active: false },
           { provider: 'plain', displayName: 'plain', settingsNs: 'llm-plain', settingsPath: ['profiles', 'plain'], active: false },
@@ -940,6 +941,26 @@ describe('ModelsSection', () => {
     expect(mutate.mock.calls[0]?.[0]).toEqual({
       ns: 'llm-pi-ai',
       ops: [{ op: 'set', path: ['providers', 'anthropic'], value: {} }],
+      expectedRevision: 0,
+    })
+    expect(set).not.toHaveBeenCalled()
+  })
+
+  it('offers a dormant route the provider-native credential its adapter declares', async () => {
+    const { mutate, set } = await mountSection()
+    fireEvent.click(screen.getByText(en.add))
+    await screen.findByLabelText(en.provider)
+    fireEvent.click(screen.getByText(en.customized))
+
+    // The add card reaches the same declared fields the row editor does: a
+    // route whose provider authenticates for itself is added without a key.
+    fireEvent.change(screen.getByLabelText(en.awsProfile), { target: { value: 'sso-prod' } })
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(mutate.mock.calls[0]?.[0]).toEqual({
+      ns: 'llm-pi-ai',
+      ops: [{ op: 'set', path: ['providers', 'anthropic', 'awsProfile'], value: 'sso-prod' }],
       expectedRevision: 0,
     })
     expect(set).not.toHaveBeenCalled()

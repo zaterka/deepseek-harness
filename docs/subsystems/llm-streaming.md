@@ -423,6 +423,19 @@ interface LlmConfigurableProvider {
    * from outside.
    */
   declared?: boolean
+  /**
+   * Profile field names, relative to {@link settingsPath}, that this route
+   * accepts for provider-native authentication — the credentials its provider
+   * resolves for itself instead of taking an API key. A configuration surface
+   * offers exactly these fields on this route's card and none on a route that
+   * lists no field, which is what keeps a provider-specific credential control
+   * off every other provider's card.
+   *
+   * Only the owning adapter can answer: which provider a route reaches, and
+   * what that provider authenticates with, is not derivable from the settings
+   * schema, whose profile shape is shared by every route in the section.
+   */
+  nativeAuthFields?: readonly string[]
 }
 ```
 

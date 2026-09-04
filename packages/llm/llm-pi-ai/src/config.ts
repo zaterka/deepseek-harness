@@ -14,7 +14,17 @@
  * @module dsh-llm-pi-ai/config
  */
 
-import type { CacheRetention, ChatTemplateKwargValue, ModelThinkingLevel, Provider, ThinkingBudgets, Transport } from '@earendil-works/pi-ai'
+import type {
+  Api,
+  CacheRetention,
+  ChatTemplateKwargValue,
+  Model,
+  ModelThinkingLevel,
+  Provider,
+  ProviderEnv,
+  ThinkingBudgets,
+  Transport,
+} from '@earendil-works/pi-ai'
 import z from '@deepseek-ai/schemastery'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
@@ -22,6 +32,7 @@ import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { resolveRetryPolicy, RetryPolicySchema } from '@deepseek-ai/dsh-llm'
 import type { ResolvedRetryPolicy, RetryPolicyConfig } from '@deepseek-ai/dsh-llm'
 import {
+  BEDROCK_API,
   CACHE_CONTROL_FORMATS,
   CHAT_TEMPLATE_VARS,
   MAX_TOKENS_FIELDS,
@@ -144,6 +155,33 @@ export interface PiAiProviderProfile {
    * to answer instead.
    */
   defaultInput?: PiAiModality[]
+  /**
+   * AWS shared-configuration profile this route's Bedrock requests
+   * authenticate as, an SSO profile included: the AWS SDK resolves it through
+   * its own credential chain, so an SSO profile uses the cached token
+   * `aws sso login` wrote and refreshes it without the harness ever reading
+   * either. It reaches the client as the request's `AWS_PROFILE` provider
+   * environment value, which is also what makes the route report itself
+   * configured, so no credential record or `apiKeyEnv` reference is involved
+   * and no secret enters this file.
+   *
+   * Refused beside {@link apiKeyEnv}: a resolved key becomes the Bedrock
+   * bearer token and takes the request off SigV4 entirely, leaving the profile
+   * unused. Refused on a route whose models all speak some other protocol,
+   * where nothing would read it.
+   */
+  awsProfile?: string
+  /**
+   * AWS region this route's Bedrock requests are signed for and addressed to,
+   * as the request's `AWS_REGION` provider environment value. Naming it is
+   * what reaches a region other than the installed catalog endpoint's
+   * `us-east-1`: the Bedrock client reads the region from the request
+   * environment and from the model's endpoint, never from the named
+   * {@link awsProfile}'s own `region` setting. Gated on the Bedrock protocol
+   * like {@link awsProfile}, but usable beside a bearer token or the ambient
+   * credential chain, neither of which carries a region.
+   */
+  awsRegion?: string
   /** Provider request headers; Harness attribution wins reserved names. */
   headers?: Record<string, string>
   /** Provider-neutral pi-ai reasoning level. */
@@ -177,7 +215,10 @@ export interface PiAiProviderProfile {
 
 /** Validated profile with its route stamped and every adapter-owned default resolved. */
 export interface ResolvedPiAiProviderProfile
-  extends Omit<PiAiProviderProfile, 'apiKeyEnv' | 'retryPolicy' | 'models' | 'displayName'> {
+  extends Omit<
+    PiAiProviderProfile,
+    'apiKeyEnv' | 'retryPolicy' | 'models' | 'displayName' | 'awsProfile' | 'awsRegion'
+  > {
   /** Harness route key and the `Models` collection key (the configuration dict key). */
   provider: string
   /** Resolved display name for selectors and configuration surfaces. */
@@ -194,6 +235,19 @@ export interface ResolvedPiAiProviderProfile
   requestImageMaxBytes: number
   /** Immutable retry policy captured with this provider route. */
   retryPolicy: ResolvedRetryPolicy
+  /**
+   * Provider environment every request on this route carries, which pi-ai
+   * prefers over the host process environment. Absent unless the profile named
+   * an AWS selector, so a route that configures none leaves the Bedrock client
+   * reading exactly the ambient environment it would have read on its own.
+   */
+  providerEnv?: ProviderEnv
+  /**
+   * The profile fields this route authenticates with instead of an API key,
+   * for the configurable-provider directory. Resolved here because it follows
+   * from the route's materialized models, which only resolution knows.
+   */
+  nativeAuthFields: readonly string[]
   /**
    * The pi-ai provider this route registers, built from the resolved models.
    * Construction happens here so an unserviceable protocol or an underspecified
@@ -315,6 +369,8 @@ const profile = z.object({
   defaultContextWindow: z.number().step(1).min(1).default(DEFAULT_CONTEXT_WINDOW),
   defaultMaxTokens: z.number().step(1).min(1).default(DEFAULT_MAX_TOKENS),
   defaultInput: z.array(z.union(MODALITIES)).default([...DEFAULT_INPUT]),
+  awsProfile: z.string(),
+  awsRegion: z.string(),
   headers: z.dict(z.string()),
   reasoning: z.union(THINKING_LEVELS),
   thinkingBudgets,
@@ -365,6 +421,70 @@ function rejectRemovedFields(provider: string, source: PiAiProviderProfile): voi
       `llm-pi-ai: provider "${provider}" sets maxRetries or maxRetryDelayMs, which were removed;`
       + ' compose agent recovery with dsh-llm-retry',
     )
+  }
+}
+
+/** The AWS selector field names, in the order a configuration surface offers them. */
+const AWS_AUTH_FIELDS: readonly string[] = ['awsProfile', 'awsRegion']
+
+/**
+ * The profile fields a route authenticates with instead of an API key, in the
+ * order a configuration surface offers them. The AWS selectors for a route the
+ * Bedrock client serves, and nothing for every other route — the same fact
+ * {@link resolveProviderEnv} refuses a misplaced selector on, answered for a
+ * surface that has to decide which controls to render.
+ * @param models - the route's materialized models.
+ * @returns the field names, or an empty list.
+ */
+export function nativeAuthFieldsFor(models: Iterable<Model<Api>>): readonly string[] {
+  for (const model of models) {
+    if (model.api === BEDROCK_API) return AWS_AUTH_FIELDS
+  }
+  return []
+}
+
+/**
+ * The provider environment one route's AWS selectors resolve to, or
+ * `undefined` when it names none.
+ *
+ * Both selectors are refused wherever nothing would read them, so neither can
+ * look applied on a route that never reaches the Bedrock client: pi-ai passes
+ * the provider environment to every protocol, and the others ignore these
+ * names silently.
+ * @param provider - the route key, named in every diagnostic.
+ * @param source - the configured profile.
+ * @param models - that route's already-materialized models.
+ * @returns the provider environment for this route, or undefined for none.
+ * @throws Error naming the route and the selector it cannot serve.
+ */
+function resolveProviderEnv(
+  provider: string,
+  source: PiAiProviderProfile,
+  models: readonly Model<Api>[],
+): ProviderEnv | undefined {
+  const { awsProfile, awsRegion } = source
+  if (awsProfile === undefined && awsRegion === undefined) return undefined
+  if (awsProfile !== undefined && awsProfile.length === 0) {
+    throw new Error(`llm-pi-ai: provider "${provider}" has an empty awsProfile`)
+  }
+  if (awsRegion !== undefined && awsRegion.length === 0) {
+    throw new Error(`llm-pi-ai: provider "${provider}" has an empty awsRegion`)
+  }
+  if (awsProfile !== undefined && source.apiKeyEnv !== undefined) {
+    throw new Error(
+      `llm-pi-ai: provider "${provider}" sets awsProfile beside apiKeyEnv; the resolved key becomes the Bedrock`
+      + ' bearer token and the AWS credential chain is never consulted, so name one or the other',
+    )
+  }
+  if (!models.some(model => model.api === BEDROCK_API)) {
+    throw new Error(
+      `llm-pi-ai: provider "${provider}" sets an AWS selector (awsProfile or awsRegion), but no model on this`
+      + ` route speaks ${BEDROCK_API}, which is the only protocol that reads one`,
+    )
+  }
+  return {
+    ...awsProfile === undefined ? {} : { AWS_PROFILE: awsProfile },
+    ...awsRegion === undefined ? {} : { AWS_REGION: awsRegion },
   }
 }
 
@@ -437,12 +557,23 @@ export function resolveProfiles(
       defaultContextWindow: source.defaultContextWindow ?? DEFAULT_CONTEXT_WINDOW,
       defaultMaxTokens: source.defaultMaxTokens ?? DEFAULT_MAX_TOKENS,
     })
-    const { apiKeyEnv, retryPolicy, models: _models, displayName: _displayName, ...rest } = source
+    const providerEnv = resolveProviderEnv(provider, source, catalog.models)
+    const {
+      apiKeyEnv,
+      retryPolicy,
+      models: _models,
+      displayName: _displayName,
+      awsProfile: _awsProfile,
+      awsRegion: _awsRegion,
+      ...rest
+    } = source
     resolved.set(provider, {
       ...rest,
       provider,
       displayName,
       ...apiKeyEnv === undefined ? {} : { apiKeyEnv: credentialRef(apiKeyEnv) },
+      ...providerEnv === undefined ? {} : { providerEnv },
+      nativeAuthFields: nativeAuthFieldsFor(catalog.models),
       streamIdleTimeoutMs,
       maxRequestImageBytes,
       requestImagePixelBudget,

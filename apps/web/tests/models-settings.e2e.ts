@@ -33,6 +33,7 @@ const DECLARED_EDIT_EXPECTED = join(SNAPSHOT_DIR, 'declared-edit.expected.md')
 const MODEL_PICKER_EXPECTED = join(SNAPSHOT_DIR, 'model-picker.expected.md')
 const NATIVE_DELETE_EXPECTED = join(SNAPSHOT_DIR, 'native-delete.expected.md')
 const DELETE_EXPECTED = join(SNAPSHOT_DIR, 'delete.expected.md')
+const NATIVE_AUTH_EXPECTED = join(SNAPSHOT_DIR, 'native-auth.expected.md')
 const MODE = webSnapshotMode()
 
 describe('web e2e: Models settings page configures a dormant provider', () => {
@@ -314,11 +315,44 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
+  it('offers a Bedrock route the AWS credential fields its adapter declares for it', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-models-native-auth'))
+    // The deletion case above closed the dialog, so this one reopens the page.
+    await page.getByRole('button', { name: '设置', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '设置' })
+    await dialog.waitFor({ timeout: 10_000 })
+    await dialog.getByRole('button', { name: '模型' }).click()
+    const add = dialog.getByRole('button', { name: '添加提供方' })
+    await add.waitFor({ timeout: 10_000 })
+    await expect.poll(async () => add.isEnabled(), { timeout: 10_000 }).toBe(true)
+    await add.click()
+    const pick = dialog.getByLabel('提供方')
+    await pick.waitFor({ timeout: 10_000 })
+    await pick.selectOption('amazon-bedrock')
+    await dialog.getByText('自定义设置').click()
+    // Declared per route by the adapter, so the fields ride the same directory
+    // the select was built from rather than any knowledge held in the browser.
+    const profile = dialog.getByRole('textbox', { name: 'AWS profile', exact: true })
+    await profile.waitFor({ timeout: 10_000 })
+    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(NATIVE_AUTH_EXPECTED, snapshot, MODE)
+
+    await profile.fill('sso-prod')
+    await dialog.getByRole('button', { name: '保存', exact: true }).click()
+    await expect.poll(
+      async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'),
+      { timeout: 10_000 },
+    ).toContain('awsProfile: sso-prod')
+    // Provider-native authentication stores no key and names no reference.
+    expect(await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')).not.toContain('apiKeyEnv')
+    expect(tripwire.pageErrors).toEqual([])
+  }, 60_000)
+
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, [
       'configured.expected.md', 'declared-edit.expected.md', 'declared.expected.md',
       'delete.expected.md', 'empty.expected.md', 'model-picker.expected.md',
-      'native-delete.expected.md',
+      'native-auth.expected.md', 'native-delete.expected.md',
     ])
   })
 })

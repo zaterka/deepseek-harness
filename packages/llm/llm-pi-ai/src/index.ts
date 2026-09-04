@@ -62,8 +62,8 @@ import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigu
 import { deepEqualJson, installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { PiAiAdapter } from './adapter.ts'
 import { authContextFrom, credentialStoreFrom } from './auth.ts'
-import { catalogProviderIds } from './catalog.ts'
-import { assertServiceable, Config, resolveProfiles } from './config.ts'
+import { catalogModels, catalogProviderIds } from './catalog.ts'
+import { assertServiceable, Config, nativeAuthFieldsFor, resolveProfiles } from './config.ts'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { discoverModels } from './discovery.ts'
 import { registerPiAiFlows } from './login.ts'
@@ -120,7 +120,7 @@ function directoryEntries(
 ): LlmConfigurableProvider[] {
   const catalog = new Set(catalogProviderIds())
   const entries = new Map<string, LlmConfigurableProvider>()
-  const declare = (provider: string, displayName: string): void => {
+  const declare = (provider: string, displayName: string, nativeAuthFields: readonly string[]): void => {
     entries.set(provider, {
       provider,
       displayName,
@@ -130,10 +130,21 @@ function directoryEntries(
       // narrowing a shipped provider's models stores a profile too, and that
       // route is still one pi-ai knows.
       declared: !catalog.has(provider),
+      // Omitted rather than sent empty: absent is what a surface reads as "no
+      // provider-native credential to offer here", and an empty list would
+      // have to mean the same thing twice.
+      ...nativeAuthFields.length === 0 ? {} : { nativeAuthFields },
     })
   }
-  for (const provider of catalog) declare(provider, provider)
-  for (const [provider, profile] of profiles) declare(provider, profile.displayName)
+  // A route with no profile is answered from the installed catalog's own
+  // models, which is the only description of it that exists yet; a profile
+  // resolved its own models and may have repointed the route's protocol.
+  for (const provider of catalog) {
+    declare(provider, provider, nativeAuthFieldsFor(catalogModels(provider).values()))
+  }
+  for (const [provider, profile] of profiles) {
+    declare(provider, profile.displayName, profile.nativeAuthFields)
+  }
   return [...entries.values()]
 }
 

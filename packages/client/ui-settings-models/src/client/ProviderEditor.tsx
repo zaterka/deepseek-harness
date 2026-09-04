@@ -41,6 +41,22 @@ type EditorLayout = 'deepseek' | 'pi-ai' | 'unknown'
 /** The public DeepSeek endpoint shown as the deepseek base-URL placeholder. */
 const DEEPSEEK_PUBLIC_BASE_URL = 'https://api.deepseek.com'
 
+/**
+ * Copy for each provider-native credential field an adapter may declare, by
+ * field name. Which fields exist is the adapter's answer, carried per route in
+ * the directory; only their wording lives here, because a field name is not
+ * text to show a user.
+ */
+const NATIVE_AUTH_COPY: Readonly<Record<string, {
+  label: keyof typeof en
+  /** Shown when neither this field nor the layer beneath it has a value. */
+  placeholder: keyof typeof en
+  hint?: keyof typeof en
+}>> = {
+  awsProfile: { label: 'awsProfile', placeholder: 'awsProfileUnset', hint: 'awsProfileHint' },
+  awsRegion: { label: 'awsRegion', placeholder: 'awsRegionDefault' },
+}
+
 /** Props of {@link ProviderEditor}. */
 export interface ProviderEditorProps {
   /** Provider route id. */
@@ -57,6 +73,13 @@ export interface ProviderEditorProps {
    * override every one of them and the card does not offer it.
    */
   declared?: boolean
+  /**
+   * Profile field names this route accepts for provider-native authentication,
+   * as its adapter declared them in the configurable-provider directory. The
+   * card renders one input per field, in this order, and none when the route
+   * declares no field.
+   */
+  nativeAuthFields?: readonly string[]
   /** The owning namespace view (schema, layers, secrets). */
   namespace: SettingsNamespaceView
   /** Settings-owned synchronous schema and immutable path operations. */
@@ -178,6 +201,15 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   const protocols = useMemo(
     () => layout === 'pi-ai' ? protocolChoices(namespace, schema) : [],
     [layout, namespace, schema],
+  )
+  // Which provider-native credential fields this route offers, as its owning
+  // adapter declared them in the directory: no list of provider ids lives on
+  // this side, and a route whose provider takes an API key alone renders none.
+  // Each name is still resolved against the section schema, so a field the
+  // adapter names but the schema does not declare renders nothing rather than
+  // writing a key `settings.mutate` would refuse.
+  const nativeAuthFields = (props.nativeAuthFields ?? []).filter(
+    field => schema.nodeAtPath(root, [...settingsPath, field]) !== undefined,
   )
 
   useEffect(() => {
@@ -433,6 +465,38 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
                 }}
               />
             </div>
+            {/* The credentials this route's provider resolves for itself,
+                offered because its own adapter declared them for this route
+                and on no other — an API-key provider's card renders nothing
+                here. The copy is keyed by field name; a field this page has no
+                copy for is still rendered, labelled by its name, because
+                hiding it would hide the only way to authenticate that route. */}
+            {nativeAuthFields.map((field) => {
+              const copy = NATIVE_AUTH_COPY[field]
+              const label = copy === undefined ? field : t(copy.label)
+              return (
+                <div className={styles['field']} key={field}>
+                  <span className={styles['fieldLabel']}>{label}</span>
+                  <input
+                    className={styles['input']}
+                    type="text"
+                    autoComplete="off"
+                    value={stringAt(draft, field) ?? ''}
+                    // The layer beneath this field, as the display name does:
+                    // clearing it restores whatever a `cordis.yml` pinned, and
+                    // only when nothing did is the answer the copy's own.
+                    placeholder={stringAt(schema.getPath(namespace.base, settingsPath), field)
+                      ?? (copy === undefined ? '' : t(copy.placeholder))}
+                    aria-label={label}
+                    disabled={disabled}
+                    onChange={(event) => { setField(field, event.target.value) }}
+                  />
+                  {copy?.hint === undefined
+                    ? null
+                    : <p className={styles['advancedHint']}>{t(copy.hint)}</p>}
+                </div>
+              )
+            })}
             {/* The protocol sits beside the endpoint it describes, as it does
                 on the create card. */}
             {ownsIdentity

@@ -29,6 +29,13 @@ export interface ConfigurableProviderView {
    * surface must treat absence as "unknown", not as "shipped".
    */
   declared?: boolean
+  /**
+   * Profile field names, relative to {@link settingsPath}, this route accepts
+   * for provider-native authentication instead of an API key. A surface
+   * renders exactly these fields on this route's card; absent means the route
+   * has no such credential to offer.
+   */
+  nativeAuthFields?: string[]
 }
 
 /** Llm-domain unary methods (the map keys llm.* of RpcMethodMap). */

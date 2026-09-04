@@ -117,6 +117,11 @@ function profileOptions(
   const enabledReasoning: ThinkingLevel | undefined = reasoning === 'off' ? undefined : reasoning
   return {
     ...apiKey === undefined ? {} : { apiKey },
+    // The route's AWS selectors, which pi-ai overlays on the host environment
+    // for both auth resolution and the Bedrock client: the collection asks the
+    // provider whether it is configured with this overlay in place, so a route
+    // authenticating through an AWS profile resolves without a stored key.
+    ...profile.providerEnv === undefined ? {} : { env: profile.providerEnv },
     ...enabledReasoning === undefined ? {} : { reasoning: enabledReasoning },
     ...profile.thinkingBudgets === undefined ? {} : { thinkingBudgets: profile.thinkingBudgets },
     ...profile.cacheRetention === undefined ? {} : { cacheRetention: profile.cacheRetention },
