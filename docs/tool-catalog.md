@@ -34,6 +34,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
 | `@deepseek-ai/dsh-tool-subagent` | `subagent` | `ctx.tools`, `ctx.subagents`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `child session events through the chosen provider` | `subagent`, `subagent_fork` | The registered tool name is the load-time `toolName` config (default `subagent`); the schema above is that default. The shipped compositions load this package once per subagent backend, so the model additionally sees `subagent_fork` bound to the fork backend. Each instance's description, `run_in_background` parameter, and system-prompt policy follow its own `backgroundMode` and `enableRunInBackground`, so the two shipped schemas are not identical: `subagent` is `continuable` and defaults omitted calls to background with automatic settlement delivery, while `subagent_fork` stays `one-shot` and defaults them to foreground — see `packages/bundle/base/cordis.patch.yml` and `examples/acp-agent/cordis.yml`. |
+| `@deepseek-ai/dsh-tool-dev-mode-pipeline` | `devagent.get-context`, `devagent.get-model`, `devagent.spawn` | `ctx.tools`, `ctx.devModePipeline`, `ctx.subagents` | `tool/call`, `tool/result`, `child session events through the chosen provider (devagent.spawn only)` | `devagent.get-model`, `devagent.get-context`, `devagent.spawn` | The three tools serve the `dev-mode` agent preset's four-stage pipeline. `devagent.spawn` starts one role subagent on the `ctx.subagents` provider configured for this plugin instance (default `spawn`), using the role's model configured in Settings > Development Mode when set, otherwise the session default; a configured extra context is prepended to the prompt. |
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`, `list_agents`, `send_message` | `ctx.tools`, `ctx.subagents`, `ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`, `tool/result`, `child session events through ctx.subagents` | - | The globally named control tools over continuable background subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while this package registers `send_message` and `interrupt_agent` once, plus `list_agents` from its separately loaded `/list-agents` plugin (whose catalog rows use the sessionProjections and live Agent registries). |
 | `@deepseek-ai/dsh-tool-subagent-report` | `report` | `ctx.subagents`, `ctx.systemPrompt`, `a live continuable in-process child Agent` | `tool/call`, `tool/result`, `a user-role message in the direct parent session` | - | Registered per continuable in-process child rather than globally, so this schema is visible only inside such a child and survives its global `toolFilter`. The same contribution installs the child-scoped `tool:report` prompt section, which this catalog does not render. The parent-facing `send_message` tool is installed independently. |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
@@ -1532,6 +1533,84 @@ Delegate a self-contained task to a subagent (a separate agent that works in its
 Source: [`packages/subagent/tool-subagent/src/index.ts`](../packages/subagent/tool-subagent/src/index.ts)
 
 The registered tool name is the load-time `toolName` config (default `subagent`); the schema above is that default. The shipped compositions load this package once per subagent backend, so the model additionally sees `subagent_fork` bound to the fork backend. Each instance's description, `run_in_background` parameter, and system-prompt policy follow its own `backgroundMode` and `enableRunInBackground`, so the two shipped schemas are not identical: `subagent` is `continuable` and defaults omitted calls to background with automatic settlement delivery, while `subagent_fork` stays `one-shot` and defaults them to foreground — see `packages/bundle/base/cordis.patch.yml` and `examples/acp-agent/cordis.yml`.
+
+<a id="deepseek-aidsh-tool-dev-mode-pipeline"></a>
+
+## `@deepseek-ai/dsh-tool-dev-mode-pipeline`
+
+### `devagent.get-context`
+
+Read the extra Development-Mode context configured in Settings > Development Mode for one component ("planner", "planReview", "implement", or "codeReview"). Call this at the start of the relevant pipeline stage (especially "planner", which this plugin cannot inject on its own since it is the main agent, not a spawned subagent) and fold any provided context into your instructions for that stage. devagent.spawn already resolves and prepends role context internally.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "component": {
+      "type": "string",
+      "description": "Pipeline component: planner, planReview, implement, or codeReview."
+    }
+  },
+  "required": [
+    "component"
+  ]
+}
+```
+
+Source: [`packages/subagent/tool-dev-mode-pipeline/src/index.ts`](../packages/subagent/tool-dev-mode-pipeline/src/index.ts)
+
+### `devagent.get-model`
+
+Read the model configured for one Development-Mode pipeline role ("planReview", "implement", or "codeReview") and return its provider and model. Call this before spawning a role subagent so the spawn uses the role’s configured model. devagent.spawn already resolves this internally, so calling it first is informational, not required.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "description": "Pipeline role: planReview, implement, or codeReview."
+    }
+  },
+  "required": [
+    "role"
+  ]
+}
+```
+
+Source: [`packages/subagent/tool-dev-mode-pipeline/src/index.ts`](../packages/subagent/tool-dev-mode-pipeline/src/index.ts)
+
+### `devagent.spawn`
+
+Spawn a Development-Mode pipeline role as a one-shot subagent on its configured model, with its configured extra context (if any) prepended to the prompt. role selects the model and context: "planReview" critiques a written plan for gaps, "implement" writes code for one planned part, "codeReview" compares generated code against the original plan. Returns the role, the resolved provider/model, whether that came from the session default, and the child’s stop reason plus text output.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "description": "planReview | implement | codeReview."
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Self-contained instructions for the subagent."
+    },
+    "label": {
+      "type": "string",
+      "description": "Optional short display label for the subagent."
+    }
+  },
+  "required": [
+    "role",
+    "prompt"
+  ]
+}
+```
+
+Source: [`packages/subagent/tool-dev-mode-pipeline/src/index.ts`](../packages/subagent/tool-dev-mode-pipeline/src/index.ts)
+
+The three tools serve the `dev-mode` agent preset's four-stage pipeline. `devagent.spawn` starts one role subagent on the `ctx.subagents` provider configured for this plugin instance (default `spawn`), using the role's model configured in Settings > Development Mode when set, otherwise the session default; a configured extra context is prepended to the prompt.
 
 <a id="deepseek-aidsh-tool-subagent-control"></a>
 

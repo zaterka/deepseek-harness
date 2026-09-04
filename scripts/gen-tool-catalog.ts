@@ -36,6 +36,9 @@ import type { SubagentProvider, SubagentReportDelivery } from '@deepseek-ai/dsh-
 import * as ToolSubagentControl from '@deepseek-ai/dsh-tool-subagent-control'
 import * as ToolSubagentListAgents from '@deepseek-ai/dsh-tool-subagent-control/list-agents'
 import * as ToolSubagentReport from '@deepseek-ai/dsh-tool-subagent-report'
+import AgentDefaultModelConfig from '@deepseek-ai/dsh-agent-default-model'
+import DevModePipelineConfig from '@deepseek-ai/dsh-dev-mode-pipeline'
+import * as ToolDevModePipeline from '@deepseek-ai/dsh-tool-dev-mode-pipeline'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
@@ -466,6 +469,23 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'The registered tool name is the load-time `toolName` config (default `subagent`); the schema above is that default. The shipped compositions load this package once per subagent backend, so the model additionally sees `subagent_fork` bound to the fork backend. Each instance\'s description, `run_in_background` parameter, and system-prompt policy follow its own `backgroundMode` and `enableRunInBackground`, so the two shipped schemas are not identical: `subagent` is `continuable` and defaults omitted calls to background with automatic settlement delivery, while `subagent_fork` stays `one-shot` and defaults them to foreground — see `packages/bundle/base/cordis.patch.yml` and `examples/acp-agent/cordis.yml`.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-dev-mode-pipeline',
+    dir: 'tool-dev-mode-pipeline',
+    source: 'packages/subagent/tool-dev-mode-pipeline/src/index.ts',
+    requires: ['ctx.tools', 'ctx.devModePipeline', 'ctx.subagents'],
+    writes: ['tool/call', 'tool/result', 'child session events through the chosen provider (devagent.spawn only)'],
+    shippedNames: ['devagent.get-model', 'devagent.get-context', 'devagent.spawn'],
+    async mount(ctx) {
+      await ctx.plugin(AgentDefaultModelConfig, { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
+      await ctx.plugin(DevModePipelineConfig)
+      await ctx.plugin(SubagentRuntime)
+      registerCatalogSubagentProvider(ctx, 'spawn')
+      await ctx.plugin(ToolDevModePipeline, { provider: 'spawn' })
+    },
+    note:
+      'The three tools serve the `dev-mode` agent preset\'s four-stage pipeline. `devagent.spawn` starts one role subagent on the `ctx.subagents` provider configured for this plugin instance (default `spawn`), using the role\'s model configured in Settings > Development Mode when set, otherwise the session default; a configured extra context is prepended to the prompt.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-subagent-control',

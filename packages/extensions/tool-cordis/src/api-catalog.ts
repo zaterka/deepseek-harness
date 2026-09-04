@@ -678,6 +678,35 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'devModePipeline',
+    summary: 'Owns the Development Mode pipeline\'s per-role model selection and per-component extra context, independently of any Host or transport.',
+    description: 'Owns the Development Mode pipeline\'s per-role model selection and per-component extra context, independently of any Host or transport. A role with no stored provider/model defers to the session default model (AgentDefaultModelConfig), read live at each call.',
+    methods: [
+      {
+        signature: 'modelFor(role: DevModeRole, defaultModel: AgentDefaultModelConfig | undefined): DevModeModelSelection',
+        description: 'Resolve one role\'s model selection: the stored provider/model when both are set, otherwise the session\'s default model.',
+        parameters: [{ name: 'role', description: 'the pipeline role to resolve.' }, { name: 'defaultModel', description: 'optional default-model service; absent falls back to an empty selection.' }],
+        returns: 'the resolved provider, model, and whether the default supplied it.',
+      },
+      {
+        signature: 'contextFor(component: DevModeComponent): string',
+        description: 'Read one component\'s stored extra context.',
+        parameters: [{ name: 'component', description: 'the pipeline component to read.' }],
+        returns: 'the stored context, or an empty string when none was set.',
+      },
+      {
+        signature: 'async saveModel(role: DevModeRole, selection: DevModeRoleSettings): Promise<void>',
+        description: 'Save one role\'s model selection. An empty provider or model clears the override, so the role reverts to the session default.',
+        parameters: [{ name: 'role', description: 'the pipeline role to update.' }, { name: 'selection', description: 'the next provider/model, or empty strings to clear.' }],
+      },
+      {
+        signature: 'async saveContext(component: DevModeComponent, context: string): Promise<void>',
+        description: 'Save one component\'s extra context.',
+        parameters: [{ name: 'component', description: 'the pipeline component to update.' }, { name: 'context', description: 'the next extra context text.' }],
+      },
+    ],
+  },
+  {
     key: 'directoryPicker',
     summary: 'Abstract directory-picking service.',
     description: 'Abstract directory-picking service. Subclass, implement `capability()`, and load the subclass as a plugin — it registers as `ctx.directoryPicker` (one implementation per context; loading a second throws, cordis\' standard duplicate-service behavior). The capability object must be stable for the service lifetime: consumers may capture it across calls.',
@@ -2854,6 +2883,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type AgentCancelCause = {\n    readonly kind: \'user\';\n} | {\n    readonly kind: \'parent\';\n} | {\n    readonly kind: \'hook\';\n    readonly reason: string;\n} | {\n    readonly kind: \'disposed\';\n};',
   },
   {
+    name: 'AgentDefaultModelConfig',
+    declaration: 'export class AgentDefaultModelConfig extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    currentSelection(): ModelSelection;\n    async saveSelection(next: ModelSelection): Promise<void>;\n}',
+  },
+  {
     name: 'AgentFactory',
     declaration: 'export interface AgentFactory {\n    createAgent(ownerCtx: Context, options: CreateAgentOptions): Promise<AgentHandle>;\n    resume(ownerCtx: Context, options: ResumeAgentOptions): Promise<AgentHandle>;\n}',
   },
@@ -3224,6 +3257,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CredentialRef',
     declaration: 'export type CredentialRef = Branded<\'CredentialRef\'>;',
+  },
+  {
+    name: 'DevModeModelSelection',
+    declaration: 'export interface DevModeModelSelection {\n    provider: string;\n    model: string;\n    fromSessionDefault: boolean;\n}',
+  },
+  {
+    name: 'DevModeRoleSettings',
+    declaration: 'export interface DevModeRoleSettings {\n    provider: string;\n    model: string;\n}',
   },
   {
     name: 'DiffCallView',

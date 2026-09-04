@@ -358,6 +358,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Layers the default ModelSelection through settings so direct and Host-backed Agent entry points share one state owner.',
   },
   {
+    key: 'devModePipeline',
+    pkg: 'dev-mode-pipeline',
+    title: 'Development Mode pipeline settings',
+    mode: 'core',
+    consumers: ['tool-dev-mode-pipeline', 'ui-settings-dev-mode-pipeline'],
+    note: 'Layers per-role model selection and per-component prompt context through settings for the `dev-mode` preset\'s four-stage pipeline.',
+  },
+  {
     key: 'agentLoop',
     pkg: 'agent-loop',
     title: 'Concrete loop driver',

@@ -32,6 +32,8 @@ flowchart LR
   cfg --> plugin_dsh_base_agent
   plugin_dsh_base_agent_default_model["agent-default-model<br/>@deepseek-ai/dsh-agent-default-model"]
   cfg --> plugin_dsh_base_agent_default_model
+  plugin_dsh_base_dev_mode_pipeline["dev-mode-pipeline<br/>@deepseek-ai/dsh-dev-mode-pipeline"]
+  cfg --> plugin_dsh_base_dev_mode_pipeline
   plugin_dsh_base_jobs["jobs<br/>@deepseek-ai/dsh-jobs-local"]
   cfg --> plugin_dsh_base_jobs
   plugin_dsh_base_llm_retry["llm-retry<br/>@deepseek-ai/dsh-llm-retry"]
@@ -150,6 +152,8 @@ flowchart LR
   cfg --> plugin_dsh_base_repeat_tool_reminder
   plugin_dsh_base_web["web<br/>@deepseek-ai/dsh-web"]
   cfg --> plugin_dsh_base_web
+  plugin_dsh_base_web_search_duckduckgo["web-search-duckduckgo<br/>@deepseek-ai/dsh-web-search-duckduckgo"]
+  cfg --> plugin_dsh_base_web_search_duckduckgo
   plugin_dsh_base_web_search_deepseek["web-search-deepseek<br/>@deepseek-ai/dsh-web-search-deepseek"]
   cfg --> plugin_dsh_base_web_search_deepseek
   plugin_dsh_base_tool_web["tool-web<br/>@deepseek-ai/dsh-tool-web"]
@@ -180,6 +184,7 @@ flowchart LR
 | `user-questions` | `@deepseek-ai/dsh-user-questions` |
 | `agent` | `@deepseek-ai/dsh-agent` |
 | `agent-default-model` | `@deepseek-ai/dsh-agent-default-model` |
+| `dev-mode-pipeline` | `@deepseek-ai/dsh-dev-mode-pipeline` |
 | `jobs` | `@deepseek-ai/dsh-jobs-local` |
 | `llm-retry` | `@deepseek-ai/dsh-llm-retry` |
 | `settings` | `@deepseek-ai/dsh-settings-file` |
@@ -239,6 +244,7 @@ flowchart LR
 | `tool-str-replace-editor` | `@deepseek-ai/dsh-tool-str-replace-editor` |
 | `repeat-tool-reminder` | `@deepseek-ai/dsh-repeat-tool-reminder` |
 | `web` | `@deepseek-ai/dsh-web` |
+| `web-search-duckduckgo` | `@deepseek-ai/dsh-web-search-duckduckgo` |
 | `web-search-deepseek` | `@deepseek-ai/dsh-web-search-deepseek` |
 | `tool-web` | `@deepseek-ai/dsh-tool-web` |
 | `tools` | `@deepseek-ai/dsh-tools` |

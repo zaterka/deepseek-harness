@@ -1,0 +1,3 @@
+name: Development Mode
+description: "Development pipeline agent: interviews the developer to clarify requirements and writes a Markdown plan, a review agent flags gaps, coding pauses for your approval before an orchestrator spawns implementation subagents, and a code-review agent checks the result against the original plan. Per-role models and prompt context are configurable in Settings > Development Mode."
+order: 4
