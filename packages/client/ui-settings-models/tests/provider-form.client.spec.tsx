@@ -28,6 +28,8 @@ const PiAiConfig = Schema.object({
     displayName: Schema.string(),
     api: Schema.union(PROTOCOLS),
     baseURL: Schema.string(),
+    awsProfile: Schema.string(),
+    awsRegion: Schema.string(),
     models: Schema.array(Schema.object({
       id: Schema.string().required(),
       name: Schema.string(),
@@ -73,6 +75,8 @@ function scriptedFace(options: {
   baseProviders?: Record<string, unknown>
   /** Routes the adapter reports as hand-declared; the rest come back as shipped. */
   declaredRoutes?: readonly string[]
+  /** Provider-native credential fields the adapter declares, by route. */
+  nativeAuthFields?: Readonly<Record<string, readonly string[]>>
   discover?: ReturnType<typeof vi.fn>
   mutate?: ReturnType<typeof vi.fn>
   set?: ReturnType<typeof vi.fn>
@@ -94,6 +98,9 @@ function scriptedFace(options: {
           settingsPath: ['providers', provider],
           active: true,
           declared: options.declaredRoutes?.includes(provider) ?? false,
+          ...options.nativeAuthFields?.[provider] === undefined
+            ? {}
+            : { nativeAuthFields: options.nativeAuthFields[provider] },
         })),
       }))),
       models: vi.fn(() => Promise.resolve(ok({ groups: [], failures: [] }))),
@@ -1402,5 +1409,82 @@ describe('API key field', () => {
     await waitFor(() => { expect(mutate).toHaveBeenCalledOnce() })
     await waitFor(() => { expect(load).toHaveBeenCalledOnce() })
     expect(screen.queryByText(en.customTitle)).toBeNull()
+  })
+})
+
+describe('provider-native credential fields', () => {
+  const bedrock = { 'amazon-bedrock': ['awsProfile', 'awsRegion'] as const }
+
+  it('writes the profile and region a Bedrock route authenticates with', async () => {
+    const { mutate } = await mountSection({
+      providers: { 'amazon-bedrock': {} },
+      nativeAuthFields: bedrock,
+    })
+    openEditor('amazon-bedrock')
+
+    fireEvent.change(screen.getByLabelText(en.awsProfile), { target: { value: 'sso-prod' } })
+    fireEvent.change(screen.getByLabelText(en.awsRegion), { target: { value: 'eu-west-1' } })
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate)).toMatchObject({
+      ns: 'llm-pi-ai',
+      ops: [
+        { op: 'set', path: ['providers', 'amazon-bedrock', 'awsProfile'], value: 'sso-prod' },
+        { op: 'set', path: ['providers', 'amazon-bedrock', 'awsRegion'], value: 'eu-west-1' },
+      ],
+    })
+  })
+
+  it('clears a stored profile instead of storing an empty one, and shows what a composition pinned', async () => {
+    const { mutate } = await mountSection({
+      providers: { 'amazon-bedrock': { awsProfile: 'sso-prod' } },
+      baseProviders: { 'amazon-bedrock': { awsProfile: 'sso-base', awsRegion: 'us-east-2' } },
+      nativeAuthFields: bedrock,
+    })
+    openEditor('amazon-bedrock')
+
+    fireEvent.change(screen.getByLabelText(en.awsProfile), { target: { value: '   ' } })
+    // The layer beneath the cleared field, not the value being cleared.
+    expect(screen.getByLabelText<HTMLInputElement>(en.awsProfile).placeholder).toBe('sso-base')
+    expect(screen.getByLabelText<HTMLInputElement>(en.awsRegion).placeholder).toBe('us-east-2')
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate)).toMatchObject({
+      ops: [{ op: 'unset', path: ['providers', 'amazon-bedrock', 'awsProfile'] }],
+    })
+  })
+
+  it('names no profile at all when nothing beneath the field does', async () => {
+    await mountSection({ providers: { 'amazon-bedrock': {} }, nativeAuthFields: bedrock })
+    openEditor('amazon-bedrock')
+
+    expect(screen.getByLabelText<HTMLInputElement>(en.awsProfile).placeholder).toBe(en.awsProfileUnset)
+    expect(screen.getByLabelText<HTMLInputElement>(en.awsRegion).placeholder).toBe(en.awsRegionDefault)
+    expect(screen.getByText(en.awsProfileHint)).toBeTruthy()
+  })
+
+  it('leaves the fields off every route whose adapter declares none', async () => {
+    await mountSection({ providers: { openai: {}, 'amazon-bedrock': {} }, nativeAuthFields: bedrock })
+    openEditor('openai')
+
+    expect(screen.getByLabelText(en.baseUrl)).toBeTruthy()
+    expect(screen.queryByLabelText(en.awsProfile)).toBeNull()
+    expect(screen.queryByLabelText(en.awsRegion)).toBeNull()
+  })
+
+  it('renders a declared field the page has no copy for, and skips one the schema lacks', async () => {
+    await mountSection({
+      providers: { 'amazon-bedrock': {} },
+      // `displayName` stands in for a field a later adapter declares before
+      // this page learns its wording; `vertexProject` for one the section
+      // schema does not declare at all, which cannot be written.
+      nativeAuthFields: { 'amazon-bedrock': ['displayName', 'vertexProject'] },
+    })
+    openEditor('amazon-bedrock')
+
+    expect(screen.getByLabelText('displayName')).toBeTruthy()
+    expect(screen.queryByLabelText('vertexProject')).toBeNull()
   })
 })

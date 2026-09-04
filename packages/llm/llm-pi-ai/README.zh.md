@@ -47,6 +47,11 @@
             reasoningEfforts:
               off:
               high: high
+      # Catalog route authenticating through the AWS credential chain: the
+      # named profile may be an SSO profile, and no key is stored anywhere.
+      amazon-bedrock:
+        awsProfile: sso-prod
+        awsRegion: eu-west-1
       # Hand-declared route: pi-ai ships nothing under this key, so the profile
       # supplies the whole provider.
       acme-gateway:
@@ -78,6 +83,12 @@
 ```
 
 字典形状使重复路由无法表示，发布前的数组形状（每个 profile 携带 `provider` 字段）会加载失败并给出迁移指引。`providers` 也可以为空或整体省略：适配器将以**休眠**姿态挂载——零路由、模型选择器不多一条——一旦 `llm-pi-ai:` settings 分节提供了 profile 就即时注册路由，分节清空时随之撤销。无论是否休眠，插件都会在可配置提供方目录（`ctx.llm.listConfigurableProviders()`，settings 路径 `providers.<provider>`）中声明每个已安装 catalog 提供方，并与当前 profile 声明的每条路由取并集，因此配置界面既能在任何路由存在之前就提供完整 catalog，也能寻址一条手工声明的路由。每个条目都带上 `declared`：pi-ai 在这个键下是否什么都没有。它跟随已安装 catalog 而非设置文档，因为收窄一个内置提供方的模型同样会存下 profile，而那条路由仍然是 pi-ai 认识的——只有适配器分得清两者，所以由目录直接给出答案，而不是留给界面去猜。哪些适配器存在归组合面；哪些提供方在运行可以完全交给用户的设置文档。向 `ctx.llm` 注册具有原子性：如果与另一适配器已拥有的任何提供方路由冲突，插件会加载失败，不注册剩余路由。模型 id 不是生命周期配置；路由未配置的模型会在发起任何提供方请求前以 `LlmError('UNKNOWN_MODEL')` 失败。
+
+### 走 AWS 凭据链的路由
+
+`awsProfile` 点名 Bedrock 路由据以认证的 AWS 共享配置 profile，SSO profile 也在其中。它作为请求的 `AWS_PROFILE` provider 环境值抵达，因此由 AWS SDK 自己的凭据链解析——SSO profile 用的是 `aws sso login` 缓存下来的令牌，并自行刷新，harness 两者都不读——而正是该值让路由把自己报告为已配置，因此既不涉及凭据记录，也不涉及 `apiKeyEnv` 引用。`awsRegion` 与它并列，作为 `AWS_REGION`；要抵达已安装 catalog 端点的 `us-east-1` 以外的区域就得点名它：Bedrock 客户端从请求环境和模型端点读取 region，从不读取所点名 profile 自身的 `region` 设置。它也可以与 bearer token 或环境凭据链并用，二者都不携带 region。
+
+两个字段在其模型全部说别的协议的路由上都会被拒绝——那里没有任何东西会读取它们；`awsProfile` 与 `apiKeyEnv` 并列时同样被拒绝：后者解析出的密钥会成为 Bedrock 的 bearer token，使请求彻底脱离 SigV4。同一事实还通过可配置提供方目录抵达配置界面：由 Bedrock 客户端服务的路由携带 `nativeAuthFields: [awsProfile, awsRegion]`，其余路由一个都不携带，因此页面只在 Bedrock 卡片上渲染这两个输入框。若路由已存储的凭据记录本身携带 `AWS_PROFILE`——pi-ai 自身的登录流程写入的正是它——这两个字段都不需要；在配置里点名它们，是把这个选择留在 `settings.yaml` 而不是凭据存储中。
 
 ## Catalog 解析
 
@@ -124,7 +135,7 @@ pi-ai 依据提供方 id 与 baseURL 决定每个请求的形状：系统提示�
 
 **没有**这份元数据的模型——条目未声明 `reasoningEfforts` 的手工声明模型，以及 pi-ai 标记为不具备推理能力的 catalog 模型——完全不公开 `reasoning`。pi-ai 会把这类模型报告为只支持 `off` 一档，但 `off` 会被翻译成*省略* reasoning 选项，而那与「不点名任何档位」产出的请求逐字节相同：选它关不掉任何东西，于是自身默认就在思考的提供方，会在界面显示 `off` 被选中的同时继续思考。把该能力报告为不可用，界面就只剩提供方默认这一项，不会再出现自相矛盾的控件。配置 profile 的 `reasoning` 值（包括 `off`）在存在时是部署默认值；省略它会保留提供方默认值。每次请求的 `GenerateOptions.reasoningEffort` 优先；未出现在确切模型能力中的档位会让**请求**在网络 I/O 前以 `UNSUPPORTED_REASONING_EFFORT` 失败，而不会被自动调整。**描述**一个模型则从不这样失败：同一提供方下各模型接受的档位并不一致，因此 `resolveModel` 对该模型拿不下的 profile 档位报告为「没有默认值」，而不是抛错。在那里抛错会让整个提供方从任何基于它构建的模型目录中消失——一个配错的 profile 字段连支持该档位的模型也一并藏起来——所以坏配置暴露在被执行处，而不是被描述处。pi-ai 的通用流选项通过省略 `reasoning` 表示 `off`。
 
-受支持的 profile 字段是 `apiKeyEnv`、`displayName`、`api`、`baseURL`、`models`、`modelOverrides`、`compat`、`defaultContextWindow`、`defaultMaxTokens`、`defaultInput`、`headers`、`reasoning`、`thinkingBudgets`、`cacheRetention`、`transport`、`timeoutMs`、`websocketConnectTimeoutMs`、`streamIdleTimeoutMs`、`maxRequestImageBytes`、`requestImagePixelBudget`、`requestImageMaxBytes` 和 `retryPolicy`。每条 profile 解析后的重试策略会随该提供方路由一同捕获；省略时使用共享的有界 normal 默认值并重试五次。流空闲间隔必须是正的有限 Node 定时器延迟，默认为五分钟，且只覆盖未完成提供方读取，不包括消费方思考时间。每条图片路由从提供方无关的规范化附件派生确定性请求版本，受 `requestImagePixelBudget`（默认总像素 2048×2048）和 `requestImageMaxBytes`（默认原始字节 1MiB）约束。读取附件前，`maxRequestImageBytes` 先按请求版本的保守上界替换超预算的最旧图片；保留版本生成后再用确切 base64 长度检查。20MiB 默认值可保留十五个按 1MiB 上限生成的请求版本，并为请求正文留下余量。同一版本用于内联 base64，其稳定描述会公开附件 ID 和实际请求图片尺寸。若已配置标头中有同名项，则以 Harness 应用归因为准。
+受支持的 profile 字段是 `apiKeyEnv`、`displayName`、`api`、`baseURL`、`models`、`modelOverrides`、`compat`、`defaultContextWindow`、`defaultMaxTokens`、`defaultInput`、`awsProfile`、`awsRegion`、`headers`、`reasoning`、`thinkingBudgets`、`cacheRetention`、`transport`、`timeoutMs`、`websocketConnectTimeoutMs`、`streamIdleTimeoutMs`、`maxRequestImageBytes`、`requestImagePixelBudget`、`requestImageMaxBytes` 和 `retryPolicy`。每条 profile 解析后的重试策略会随该提供方路由一同捕获；省略时使用共享的有界 normal 默认值并重试五次。流空闲间隔必须是正的有限 Node 定时器延迟，默认为五分钟，且只覆盖未完成提供方读取，不包括消费方思考时间。每条图片路由从提供方无关的规范化附件派生确定性请求版本，受 `requestImagePixelBudget`（默认总像素 2048×2048）和 `requestImageMaxBytes`（默认原始字节 1MiB）约束。读取附件前，`maxRequestImageBytes` 先按请求版本的保守上界替换超预算的最旧图片；保留版本生成后再用确切 base64 长度检查。20MiB 默认值可保留十五个按 1MiB 上限生成的请求版本，并为请求正文留下余量。同一版本用于内联 base64，其稳定描述会公开附件 ID 和实际请求图片尺寸。若已配置标头中有同名项，则以 Harness 应用归因为准。
 
 适配器强制 pi-ai SDK `maxRetries` 为零，因此一次 `stream()` 调用只会发起一次提供方请求。已移除 profile 字段 `maxRetries` 和 `maxRetryDelayMs` 会使加载失败，而不是静默倍增或隐藏单独组合的 agent（智能体）级重试预算。空闲超时会 abort SDK 的稳定请求信号，并以 `TIMEOUT` 呈现；较早的调用方 abort 仍为 `ABORTED`。
 

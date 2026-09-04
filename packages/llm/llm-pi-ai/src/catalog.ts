@@ -260,6 +260,15 @@ const ANTHROPIC_COMPAT_GATE = {
   supportsToolReferences: 'withhold',
 } as const satisfies Record<keyof AnthropicMessagesCompat, CompatDisposition>
 
+/**
+ * pi-ai's Amazon Bedrock wire protocol. The only protocol whose client
+ * authenticates through the AWS credential chain and reads the AWS provider
+ * environment, so it is also the gate for a route's AWS selectors. Constrained
+ * to `KnownApi` so an upstream rename fails compilation here instead of
+ * silently withdrawing that gate.
+ */
+export const BEDROCK_API = 'bedrock-converse-stream' satisfies KnownApi
+
 /** Disposition of every `BedrockCompat` field; a drift gate like the one above. */
 const BEDROCK_COMPAT_GATE = {
   supportsStrictMode: 'offer',
@@ -289,7 +298,7 @@ const COMPAT_GATES: Readonly<Record<ApiWithCompat, Readonly<Record<string, Compa
   'azure-openai-responses': RESPONSES_COMPAT_GATE,
   'openai-codex-responses': RESPONSES_COMPAT_GATE,
   'anthropic-messages': ANTHROPIC_COMPAT_GATE,
-  'bedrock-converse-stream': BEDROCK_COMPAT_GATE,
+  [BEDROCK_API]: BEDROCK_COMPAT_GATE,
 }
 
 /**

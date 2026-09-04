@@ -1066,6 +1066,33 @@ export interface PiAiProviderProfile {
    * to answer instead.
    */
   defaultInput?: PiAiModality[]
+  /**
+   * AWS shared-configuration profile this route's Bedrock requests
+   * authenticate as, an SSO profile included: the AWS SDK resolves it through
+   * its own credential chain, so an SSO profile uses the cached token
+   * `aws sso login` wrote and refreshes it without the harness ever reading
+   * either. It reaches the client as the request's `AWS_PROFILE` provider
+   * environment value, which is also what makes the route report itself
+   * configured, so no credential record or `apiKeyEnv` reference is involved
+   * and no secret enters this file.
+   *
+   * Refused beside {@link apiKeyEnv}: a resolved key becomes the Bedrock
+   * bearer token and takes the request off SigV4 entirely, leaving the profile
+   * unused. Refused on a route whose models all speak some other protocol,
+   * where nothing would read it.
+   */
+  awsProfile?: string
+  /**
+   * AWS region this route's Bedrock requests are signed for and addressed to,
+   * as the request's `AWS_REGION` provider environment value. Naming it is
+   * what reaches a region other than the installed catalog endpoint's
+   * `us-east-1`: the Bedrock client reads the region from the request
+   * environment and from the model's endpoint, never from the named
+   * {@link awsProfile}'s own `region` setting. Gated on the Bedrock protocol
+   * like {@link awsProfile}, but usable beside a bearer token or the ambient
+   * credential chain, neither of which carries a region.
+   */
+  awsRegion?: string
   /** Provider request headers; Harness attribution wins reserved names. */
   headers?: Record<string, string>
   /** Provider-neutral pi-ai reasoning level. */
@@ -1241,7 +1268,7 @@ export type PiAiThinkingFormat = NonNullable<OpenAICompletionsCompat['thinkingFo
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:213`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:267`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="deepseek-aidsh-llm-replay"></a>
 
