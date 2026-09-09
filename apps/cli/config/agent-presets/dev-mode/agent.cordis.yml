@@ -17,8 +17,8 @@
 # HOST composition (packages/bundle/base/cordis.patch.yml) so they are
 # available whether or not any session mounts this preset. This file
 # contributes only the model-facing tools that resolve that registry
-# (`@deepseek-ai/dsh-tool-dev-mode-pipeline`: devagent.get-model,
-# devagent.get-context, devagent.spawn) plus the persona and everything else a
+# (`@deepseek-ai/dsh-tool-dev-mode-pipeline`: devagent_get_model,
+# devagent_get_context, devagent_spawn) plus the persona and everything else a
 # full coding agent needs (shell, filesystem, jobs, skills, goals, plan mode,
 # delegation, web).
 #
@@ -58,10 +58,10 @@
          subsystem, API/schema/data-flow changes, edge cases, failure modes,
          tests, acceptance criteria, and explicit assumptions. At the start of
          this stage, read your configured extra context with
-         devagent.get-context (component "planner") and fold any provided
+         devagent_get_context (component "planner") and fold any provided
          context into your planning instructions.
       2. PLAN REVIEW: critique the plan for gaps with a dedicated review
-         subagent. Call devagent.spawn with role "planReview" (it runs the
+         subagent. Call devagent_spawn with role "planReview" (it runs the
          review subagent on the model and extra context configured on the
          Development Mode settings page). Fold the returned recommendations
          into the plan file when they are valid.
@@ -71,10 +71,10 @@
          (imperative coding language in the task still means code it, but you
          present the plan and its review first). After approval, act as the
          coding orchestrator and spawn implementation subagents to carry out
-         each part of the plan with devagent.spawn, role "implement".
+         each part of the plan with devagent_spawn, role "implement".
       4. CODE REVIEW: after the implementation, compare the generated code
          against the original plan with a dedicated review subagent. Call
-         devagent.spawn with role "codeReview". Fix legitimate gaps and
+         devagent_spawn with role "codeReview". Fix legitimate gaps and
          report the outcome.
 
 - id: agent-instructions
@@ -165,7 +165,7 @@
 # The `subagents` registry and its spawn/fork backends live in the HOST
 # composition. This preset contributes the delegation TOOLS, which resolve
 # that host registry. `tool-dev-mode-pipeline` also resolves the host registry
-# directly for its own devagent.spawn tool, using the per-role model set on the
+# directly for its own devagent_spawn tool, using the per-role model set on the
 # Development Mode settings page.
 - id: delegation
   name: cordis:group
@@ -207,8 +207,8 @@
         subagentProvider: spawn
         maxRounds: 64
 
-    # Development Mode's own pipeline tools: devagent.get-model,
-    # devagent.get-context, devagent.spawn. Spawns role subagents on the
+    # Development Mode's own pipeline tools: devagent_get_model,
+    # devagent_get_context, devagent_spawn. Spawns role subagents on the
     # `spawn` provider registered above.
     - id: tool-dev-mode-pipeline
       name: '@deepseek-ai/dsh-tool-dev-mode-pipeline'

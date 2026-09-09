@@ -781,6 +781,14 @@ function resolveMaxParallelSubCalls(value: number | undefined): number {
 }
 
 /**
+ * Every provider this harness routes to accepts a tool name matching this
+ * pattern; AWS Bedrock's Converse API is the strictest observed member and
+ * rejects any other character, a dot included, so this is the portable
+ * floor rather than one provider's own rule.
+ */
+const TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/
+
+/**
  * Tool registry and execution pipeline. Scoped registrations shadow globals;
  * one visibility resolver feeds presentation, lookup, and dispatch.
  */
@@ -1036,6 +1044,9 @@ export class ToolRuntime extends Service {
    */
   register(definition: ToolDefinition): () => void {
     const name = definition.name
+    if (!TOOL_NAME_PATTERN.test(name)) {
+      throw new TypeError(`tool name "${name}" must match ${String(TOOL_NAME_PATTERN)} — providers such as AWS Bedrock reject any other character (a dot included) in a tool name`)
+    }
     const output = (definition as Partial<ToolDefinition>).output
     if (output === undefined || typeof output !== 'object'
       || typeof output.render !== 'function'

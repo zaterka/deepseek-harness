@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 Per-role model selection and per-component prompt context for the Development Mode pipeline: the settings-backed store the `dev-mode` preset's planner (main agent), plan-review, implementation, and code-review components read from. `DevModePipelineConfig` provides `ctx.devModePipeline`.
 
-The pipeline has four components: `planner` (the session's main agent, stage 1 and the coding-orchestrator half of stage 3), and three spawnable roles — `planReview`, `implement`, `codeReview` — that `@deepseek-ai/dsh-tool-dev-mode-pipeline`'s `devagent.spawn` tool starts as subagents. Each role has an independent model selection; each of the four components has independent extra prompt context.
+The pipeline has four components: `planner` (the session's main agent, stage 1 and the coding-orchestrator half of stage 3), and three spawnable roles — `planReview`, `implement`, `codeReview` — that `@deepseek-ai/dsh-tool-dev-mode-pipeline`'s `devagent_spawn` tool starts as subagents. Each role has an independent model selection; each of the four components has independent extra prompt context.
 
 - `ctx.devModePipeline.modelFor(role, defaultModel)` resolves one role's provider/model: the stored selection when both fields are set, otherwise `defaultModel.currentSelection()` (or an empty selection when no default-model service is mounted). The returned `fromSessionDefault` flag reports which source answered.
 - `ctx.devModePipeline.contextFor(component)` returns the stored extra context for one component, or `''` when none is set.

@@ -4,7 +4,7 @@
 
 为开发模式（Development Mode）流水线提供按角色的模型选择与按环节的提示词上下文：`dev-mode` preset 的规划者（主 Agent）、计划评审、实现与代码评审各环节读取的、由 settings 支撑的存储。`DevModePipelineConfig` 提供 `ctx.devModePipeline`。
 
-流水线包含四个环节：`planner`（会话自身的主 Agent，对应第 1 阶段以及第 3 阶段中作为编码协调者的部分），以及三个可派生的角色——`planReview`、`implement`、`codeReview`——由 `@deepseek-ai/dsh-tool-dev-mode-pipeline` 的 `devagent.spawn` 工具作为子代理启动。每个角色拥有独立的模型选择；四个环节各自拥有独立的额外提示词上下文。
+流水线包含四个环节：`planner`（会话自身的主 Agent，对应第 1 阶段以及第 3 阶段中作为编码协调者的部分），以及三个可派生的角色——`planReview`、`implement`、`codeReview`——由 `@deepseek-ai/dsh-tool-dev-mode-pipeline` 的 `devagent_spawn` 工具作为子代理启动。每个角色拥有独立的模型选择；四个环节各自拥有独立的额外提示词上下文。
 
 - `ctx.devModePipeline.modelFor(role, defaultModel)` 解析某一角色的提供方／模型：当两个字段都已设置时使用已存储的选择，否则使用 `defaultModel.currentSelection()`（若未挂载默认模型服务则返回空选择）。返回值中的 `fromSessionDefault` 标记指明结果来源。
 - `ctx.devModePipeline.contextFor(component)` 返回某一环节已存储的额外上下文，未设置时返回 `''`。

@@ -1,9 +1,9 @@
 /**
  * Model-facing tools for the Development Mode pipeline: per-role model
- * lookup (`devagent.get-model`), per-component extra-context lookup
- * (`devagent.get-context`), and role-subagent delegation on the role's
+ * lookup (`devagent_get_model`), per-component extra-context lookup
+ * (`devagent_get_context`), and role-subagent delegation on the role's
  * configured model with its configured extra context prepended
- * (`devagent.spawn`).
+ * (`devagent_spawn`).
  *
  * @module @deepseek-ai/dsh-tool-dev-mode-pipeline
  */
@@ -21,7 +21,7 @@ import type {} from '@deepseek-ai/dsh-subagent'
 export const name = 'tool-dev-mode-pipeline'
 export const inject = ['tools', 'devModePipeline', 'subagents']
 
-/** Config: which registered `ctx.subagents` provider `devagent.spawn` starts children on. */
+/** Config: which registered `ctx.subagents` provider `devagent_spawn` starts children on. */
 export interface Config {
   /** The `ctx.subagents` provider name to start role runs on (e.g. `spawn`). */
   provider: string
@@ -56,11 +56,11 @@ export function apply(ctx: Context, config: Config): void {
   // ctx.tools.register() already returns a disposer owned by this calling
   // fiber (an effect); no additional wrapping is needed for cleanup.
   ctx.tools.register(defineTool({
-    name: 'devagent.get-model',
+    name: 'devagent_get_model',
     description:
       'Read the model configured for one Development-Mode pipeline role ("planReview", "implement", or '
       + '"codeReview") and return its provider and model. Call this before spawning a role subagent so the spawn '
-      + 'uses the role\u2019s configured model. devagent.spawn already resolves this internally, so calling it '
+      + 'uses the role\u2019s configured model. devagent_spawn already resolves this internally, so calling it '
       + 'first is informational, not required.',
     parameters: {
       role: { type: 'string', required: true, description: ROLE_DESCRIPTION },
@@ -76,7 +76,7 @@ export function apply(ctx: Context, config: Config): void {
           error: { type: 'string' },
         },
       },
-      render: (_args, value) => [{ type: 'text', text: `devagent.get-model -> ${JSON.stringify(value)}` }],
+      render: (_args, value) => [{ type: 'text', text: `devagent_get_model -> ${JSON.stringify(value)}` }],
     },
     execute(args) {
       if (!isDevModeRole(args.role)) {
@@ -88,12 +88,12 @@ export function apply(ctx: Context, config: Config): void {
   }))
 
   ctx.tools.register(defineTool({
-    name: 'devagent.get-context',
+    name: 'devagent_get_context',
     description:
       'Read the extra Development-Mode context configured in Settings > Development Mode for one component '
       + '("planner", "planReview", "implement", or "codeReview"). Call this at the start of the relevant pipeline '
       + 'stage (especially "planner", which this plugin cannot inject on its own since it is the main agent, not '
-      + 'a spawned subagent) and fold any provided context into your instructions for that stage. devagent.spawn '
+      + 'a spawned subagent) and fold any provided context into your instructions for that stage. devagent_spawn '
       + 'already resolves and prepends role context internally.',
     parameters: {
       component: { type: 'string', required: true, description: COMPONENT_DESCRIPTION },
@@ -108,7 +108,7 @@ export function apply(ctx: Context, config: Config): void {
           error: { type: 'string' },
         },
       },
-      render: (_args, value) => [{ type: 'text', text: `devagent.get-context -> ${JSON.stringify(value)}` }],
+      render: (_args, value) => [{ type: 'text', text: `devagent_get_context -> ${JSON.stringify(value)}` }],
     },
     execute(args) {
       if (!isDevModeComponent(args.component)) {
@@ -119,7 +119,7 @@ export function apply(ctx: Context, config: Config): void {
   }))
 
   ctx.tools.register(defineTool({
-    name: 'devagent.spawn',
+    name: 'devagent_spawn',
     description:
       'Spawn a Development-Mode pipeline role as a one-shot subagent on its configured model, with its '
       + 'configured extra context (if any) prepended to the prompt. role selects the model and context: '
@@ -154,7 +154,7 @@ export function apply(ctx: Context, config: Config): void {
       }
       const parent = exec.agent
       if (parent === undefined) {
-        return { ok: false, role: args.role, error: 'devagent.spawn requires a calling agent (exec.agent was undefined)' }
+        return { ok: false, role: args.role, error: 'devagent_spawn requires a calling agent (exec.agent was undefined)' }
       }
       const defaultModel = ctx.get('agentDefaultModel')
       const selection = ctx.devModePipeline.modelFor(args.role, defaultModel)
