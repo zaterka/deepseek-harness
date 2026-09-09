@@ -159,6 +159,15 @@ describe('loadProfile', () => {
     }
     expect(readProfileManifest('t', resolveProfileDir('web', home)).dsh?.profile?.bundles)
       .toEqual([...PROFILE_TEMPLATES.web ?? []])
+    // The tui template auto-initializes over the same base bundle.
+    expect(PROFILE_TEMPLATES.tui).toEqual(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-tui'])
+    try {
+      loadProfile('t', 'tui', anchor, home)
+    } catch {
+      // Resolution failure is the plain-Node outcome for this empty anchor.
+    }
+    expect(readProfileManifest('t', resolveProfileDir('tui', home)).dsh?.profile?.bundles)
+      .toEqual([...PROFILE_TEMPLATES.tui ?? []])
   })
 
   it('normalizes only the exact installation-owned headless bundle tuple', () => {
