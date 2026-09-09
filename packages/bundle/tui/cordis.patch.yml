@@ -1,0 +1,46 @@
+# The dsh-tui bundle patch: interactive terminal mode directly over dsh-base.
+# It mounts no Host, HTTP server, Web runtime, or browser plugin — exactly the
+# in-process shape of dsh-headless, but with a persistent readline REPL and the
+# terminal-provided interaction seams (user-questions provider, approval
+# answerer). The dsh-base layer already supplies every model-facing tool row
+# (bash, fs, skill, jobs, subagent, workflow, todo, goal, web, plan-mode) plus
+# the user-questions/approval services, session persistence, and the command
+# registry; this bundle only adds its own surface rows.
+
+- id: system-prompt
+  config:
+    persona: >-
+      You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+
+# The shared module-reload HMR row stays off; the launcher's watch-only
+# fallback still keeps the user patch layers live until the run exits.
+- id: hmr
+  disabled: true
+
+- id: tools
+  config:
+    # Keep the same temporary process-wide Code Mode opt-in as the Web surface.
+    mode: !!js process.env.DSH_TOOLS_MODE
+
+- insert:
+    # `tool-ask-user` is not a base-layer tool: it lives in the Web/code agent
+    # presets. This surface is interactive, so the model-facing ask_user_question
+    # consumer rides alongside the terminal provider this bundle registers.
+    - id: tool-ask-user
+      name: '@deepseek-ai/dsh-tool-ask-user'
+
+    # Code Mode is a core execution capability, not a Web component.
+    - id: code-runtime
+      name: '@deepseek-ai/dsh-code-runtime-worker-thread'
+
+    - id: tui-startup
+      name: '@deepseek-ai/dsh-tui/startup'
+
+    # Reads its flags from the ordinary tuiStartup provider.
+    - id: tui-client
+      name: '@deepseek-ai/dsh-tui'
+      inject: [tuiStartup]
+      config:
+        resumeSessionId: !!js ctx.tuiStartup.resumeSessionId
+        provider: !!js ctx.tuiStartup.provider
+        model: !!js ctx.tuiStartup.model

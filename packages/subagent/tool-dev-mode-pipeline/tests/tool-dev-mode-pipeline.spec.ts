@@ -90,10 +90,10 @@ function text(result: { content: { type: string; text?: string }[] }): string {
 }
 
 describe('dsh-tool-dev-mode-pipeline', () => {
-  describe('devagent.get-model', () => {
+  describe('devagent_get_model', () => {
     it('resolves an unconfigured role to the session default model', async () => {
       const ctx = await setup({ provider: 'spawn' })
-      const result = await callTool(ctx, 'devagent.get-model', { role: 'planReview' })
+      const result = await callTool(ctx, 'devagent_get_model', { role: 'planReview' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected success')
       expect(result.value).toEqual({
@@ -104,7 +104,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
     it('resolves a configured role to its stored model', async () => {
       const ctx = await setup({ provider: 'spawn' })
       await ctx.devModePipeline.saveModel('codeReview', { provider: 'acme-gateway', model: 'acme-large' })
-      const result = await callTool(ctx, 'devagent.get-model', { role: 'codeReview' })
+      const result = await callTool(ctx, 'devagent_get_model', { role: 'codeReview' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected success')
       expect(result.value).toEqual({
@@ -114,17 +114,17 @@ describe('dsh-tool-dev-mode-pipeline', () => {
 
     it('rejects an unknown role', async () => {
       const ctx = await setup({ provider: 'spawn' })
-      const result = await callTool(ctx, 'devagent.get-model', { role: 'planner' })
+      const result = await callTool(ctx, 'devagent_get_model', { role: 'planner' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected a soft error value, not a pipeline failure')
       expect(result.value).toEqual({ error: 'role must be one of planReview | implement | codeReview' })
     })
   })
 
-  describe('devagent.get-context', () => {
+  describe('devagent_get_context', () => {
     it('reads an unconfigured component as empty context', async () => {
       const ctx = await setup({ provider: 'spawn' })
-      const result = await callTool(ctx, 'devagent.get-context', { component: 'planner' })
+      const result = await callTool(ctx, 'devagent_get_context', { component: 'planner' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected success')
       expect(result.value).toEqual({ component: 'planner', context: '' })
@@ -133,7 +133,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
     it('reads a configured component context', async () => {
       const ctx = await setup({ provider: 'spawn' })
       await ctx.devModePipeline.saveContext('planner', 'Always check the CHANGELOG first.')
-      const result = await callTool(ctx, 'devagent.get-context', { component: 'planner' })
+      const result = await callTool(ctx, 'devagent_get_context', { component: 'planner' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected success')
       expect(result.value).toEqual({ component: 'planner', context: 'Always check the CHANGELOG first.' })
@@ -141,17 +141,17 @@ describe('dsh-tool-dev-mode-pipeline', () => {
 
     it('rejects an unknown component', async () => {
       const ctx = await setup({ provider: 'spawn' })
-      const result = await callTool(ctx, 'devagent.get-context', { component: 'nope' })
+      const result = await callTool(ctx, 'devagent_get_context', { component: 'nope' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected a soft error value, not a pipeline failure')
       expect(result.value).toEqual({ error: 'component must be one of planner | planReview | implement | codeReview' })
     })
   })
 
-  describe('devagent.spawn', () => {
+  describe('devagent_spawn', () => {
     it('spawns the role on the session default model when unconfigured', async () => {
       const ctx = await setup({ provider: 'spawn' }, { reply: 'plan looks solid' })
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'planReview', prompt: 'review PLAN.md' })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'planReview', prompt: 'review PLAN.md' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected success')
       expect(result.value).toEqual({
@@ -169,7 +169,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
     it('spawns the role on its configured model when set', async () => {
       const ctx = await setup({ provider: 'spawn' }, { reply: 'done' })
       await ctx.devModePipeline.saveModel('implement', { provider: 'acme-gateway', model: 'acme-large' })
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'implement', prompt: 'implement part 1' })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'implement', prompt: 'implement part 1' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected success')
       expect(result.value).toMatchObject({
@@ -181,7 +181,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
       let captured: SubagentStartRequest | undefined
       const ctx = await setup({ provider: 'spawn' }, { onStart: (request) => { captured = request } })
       await ctx.devModePipeline.saveContext('codeReview', 'Pay extra attention to test coverage.')
-      await callTool(ctx, 'devagent.spawn', { role: 'codeReview', prompt: 'review the diff' })
+      await callTool(ctx, 'devagent_spawn', { role: 'codeReview', prompt: 'review the diff' })
       const promptText = captured?.prompt.find(b => b.type === 'text')
       expect(promptText).toMatchObject({
         type: 'text',
@@ -192,7 +192,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
     it('sends the plain prompt when no extra context is configured', async () => {
       let captured: SubagentStartRequest | undefined
       const ctx = await setup({ provider: 'spawn' }, { onStart: (request) => { captured = request } })
-      await callTool(ctx, 'devagent.spawn', { role: 'implement', prompt: 'implement part 1' })
+      await callTool(ctx, 'devagent_spawn', { role: 'implement', prompt: 'implement part 1' })
       expect(captured?.prompt).toEqual([{ type: 'text', text: 'implement part 1' }])
     })
 
@@ -201,7 +201,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
         { provider: 'spawn' },
         { stopReason: 'error', diagnostic: 'scripted child transport failure' },
       )
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'planReview', prompt: 'review PLAN.md' })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'planReview', prompt: 'review PLAN.md' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected success')
       expect(result.value).toMatchObject({
@@ -212,14 +212,14 @@ describe('dsh-tool-dev-mode-pipeline', () => {
     it('uses an explicit label when provided instead of the default devagent-<role> label', async () => {
       let captured: SubagentStartRequest | undefined
       const ctx = await setup({ provider: 'spawn' }, { onStart: (request) => { captured = request } })
-      await callTool(ctx, 'devagent.spawn', { role: 'implement', prompt: 'implement part 1', label: 'custom label' })
+      await callTool(ctx, 'devagent_spawn', { role: 'implement', prompt: 'implement part 1', label: 'custom label' })
       expect(captured?.label).toBe('custom label')
     })
 
     it('omits agentOptions when no default model service is mounted and the role is unconfigured', async () => {
       let captured: SubagentStartRequest | undefined
       const ctx = await setupWithoutDefaultModel({ provider: 'spawn' }, { onStart: (request) => { captured = request } })
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'implement', prompt: 'implement part 1' })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'implement', prompt: 'implement part 1' })
       expect(captured?.agentOptions).toBeUndefined()
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected success')
@@ -228,7 +228,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
 
     it('reports a run.result rejection as a failed call', async () => {
       const ctx = await setup({ provider: 'spawn' }, { resultRejection: new Error('child crashed') })
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'planReview', prompt: 'review PLAN.md' })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'planReview', prompt: 'review PLAN.md' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected a soft error value, not a pipeline failure')
       expect(result.value).toMatchObject({ ok: false, role: 'planReview', error: 'Error: child crashed' })
@@ -236,7 +236,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
 
     it('reports a run.dispose rejection when result settles successfully', async () => {
       const ctx = await setup({ provider: 'spawn' }, { disposeRejection: new Error('dispose failed') })
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'planReview', prompt: 'review PLAN.md' })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'planReview', prompt: 'review PLAN.md' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected a soft error value, not a pipeline failure')
       expect(result.value).toMatchObject({ ok: false, role: 'planReview', error: 'Error: dispose failed' })
@@ -247,7 +247,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
         { provider: 'spawn' },
         { resultRejection: new Error('child crashed'), disposeRejection: new Error('dispose failed') },
       )
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'planReview', prompt: 'review PLAN.md' })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'planReview', prompt: 'review PLAN.md' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected a soft error value, not a pipeline failure')
       expect(result.value).toMatchObject({
@@ -257,7 +257,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
 
     it('reports a start() throw (Error) as a failed call', async () => {
       const ctx = await setup({ provider: 'spawn' }, { startRejection: new Error('provider rejected start') })
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'planReview', prompt: 'review PLAN.md' })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'planReview', prompt: 'review PLAN.md' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected a soft error value, not a pipeline failure')
       expect(result.value).toMatchObject({ ok: false, role: 'planReview', error: 'provider rejected start' })
@@ -265,7 +265,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
 
     it('reports a start() throw (non-Error) as a failed call', async () => {
       const ctx = await setup({ provider: 'spawn' }, { startRejection: 'plain rejection string' })
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'planReview', prompt: 'review PLAN.md' })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'planReview', prompt: 'review PLAN.md' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected a soft error value, not a pipeline failure')
       expect(result.value).toMatchObject({ ok: false, role: 'planReview', error: 'plain rejection string' })
@@ -273,7 +273,7 @@ describe('dsh-tool-dev-mode-pipeline', () => {
 
     it('rejects an unknown role', async () => {
       const ctx = await setup({ provider: 'spawn' })
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'planner', prompt: 'plan it' })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'planner', prompt: 'plan it' })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected a soft error value, not a pipeline failure')
       expect(result.value).toEqual({ ok: false, error: 'role must be one of planReview | implement | codeReview' })
@@ -281,13 +281,13 @@ describe('dsh-tool-dev-mode-pipeline', () => {
 
     it('rejects a call with no calling agent', async () => {
       const ctx = await setup({ provider: 'spawn' })
-      const result = await callTool(ctx, 'devagent.spawn', { role: 'planReview', prompt: 'review' }, { agent: undefined })
+      const result = await callTool(ctx, 'devagent_spawn', { role: 'planReview', prompt: 'review' }, { agent: undefined })
       expect(result.isError).toBe(false)
       if (result.isError) throw new Error('expected a soft error value, not a pipeline failure')
       expect(result.value).toEqual({
         ok: false,
         role: 'planReview',
-        error: 'devagent.spawn requires a calling agent (exec.agent was undefined)',
+        error: 'devagent_spawn requires a calling agent (exec.agent was undefined)',
       })
     })
   })

@@ -2577,7 +2577,7 @@ Source: [`packages/shell/tool-bash-persistent/src/index.ts:432`](../packages/she
 Requires: `tools` · `devModePipeline` · `subagents`
 
 ```ts config-catalog
-/** Config: which registered `ctx.subagents` provider `devagent.spawn` starts children on. */
+/** Config: which registered `ctx.subagents` provider `devagent_spawn` starts children on. */
 export interface Config {
   /** The `ctx.subagents` provider name to start role runs on (e.g. `spawn`). */
   provider: string
@@ -3033,6 +3033,26 @@ export type ToolPresentationMode = 'native' | 'code' | 'both'
 ```
 
 Source: [`packages/core/tools/src/index.ts:654`](../packages/core/tools/src/index.ts)
+
+<a id="deepseek-aidsh-tui"></a>
+
+## `@deepseek-ai/dsh-tui`
+
+Requires: `agentDefaultModel` · `agents` · `sessions` · `TUI_STARTUP_SERVICE`
+
+```ts config-catalog
+/** Plugin config: the startup-flag values resolved from the injected provider. */
+export interface Config {
+  /** Optional persisted session id to resume instead of starting fresh. */
+  resumeSessionId?: string
+  /** Optional provider route override for the interactive session. */
+  provider?: string
+  /** Optional model id override for the interactive session. */
+  model?: string
+}
+```
+
+Source: [`packages/bundle/tui/src/index.ts:44`](../packages/bundle/tui/src/index.ts)
 
 <a id="deepseek-aidsh-typert-loader"></a>
 

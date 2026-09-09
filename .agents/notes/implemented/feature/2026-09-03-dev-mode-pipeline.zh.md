@@ -15,13 +15,13 @@ Status: implemented
 该流水线以三个普通的工作区包外加一个 preset 的形式随产品发布，方式与 `agent-default-model` 已经发布一份按部署配置的模型默认值完全一致：
 
 - [`@deepseek-ai/dsh-dev-mode-pipeline`](../../../../packages/core/dev-mode-pipeline/README.zh.md)（`ctx.devModePipeline`）持有数据：一个设置命名空间（`dev-mode-pipeline`），为每个可派生角色（`planReview`、`implement`、`codeReview`）存储一份 `{ provider, model }`，并为每个流水线环节（这三个角色加上 `planner`，即主 Agent 阶段）存储一份额外上下文字符串。`modelFor(role, defaultModel)` 将某一角色的模型解析为：两个字段都已设置时使用已存储的选择，否则使用传入的 `agentDefaultModel` 服务当前的选择——这正是 `installSettingsSection` 已经赋予 `agent-default-model` 的同一套 settings 分层模式，此处直接复用而非重新发明。
-- [`@deepseek-ai/dsh-tool-dev-mode-pipeline`](../../../../packages/subagent/tool-dev-mode-pipeline/README.zh.md) 是 agent 层的消费方：三个模型可见工具（`devagent.get-model`、`devagent.get-context`、`devagent.spawn`）读取 `ctx.devModePipeline`；其中 `devagent.spawn` 会通过一个已配置的 `ctx.subagents` provider，以该角色解析出的模型启动一个角色子代理，并把该角色的额外上下文拼接到提示词之前。
+- [`@deepseek-ai/dsh-tool-dev-mode-pipeline`](../../../../packages/subagent/tool-dev-mode-pipeline/README.zh.md) 是 agent 层的消费方：三个模型可见工具（`devagent_get_model`、`devagent_get_context`、`devagent_spawn`）读取 `ctx.devModePipeline`；其中 `devagent_spawn` 会通过一个已配置的 `ctx.subagents` provider，以该角色解析出的模型启动一个角色子代理，并把该角色的额外上下文拼接到提示词之前。工具名使用下划线而非点号，遵循本仓库统一约定（`ask_user_question`、`subagent_fork`），使每个工具名都落在 `^[a-zA-Z0-9_-]+$` 之内——AWS Bedrock 的 Converse API 会拒绝包含点号的 `toolSpec.name`，因此点号命名的工具一旦路由经过 Bedrock 便会失效，即便 DeepSeek 自身的 API 能够接受。
 - [`@deepseek-ai/dsh-client-ui-settings-dev-mode-pipeline`](../../../../packages/client/ui-settings-dev-mode-pipeline/README.zh.md) 注册一个带两个标签页的 `settings.section`——Models（每个角色一个提供方／模型选择器，数据来自主机侧的 `llm.models` 目录）与 Prompts（每个环节的只读基线提示词旁配有可编辑的额外上下文字段）——通过与 `ui-settings-models` 绑定自身命名空间相同的共享 `ctx.settingsScope` seam，绑定到同一设置命名空间。
 - `dev-mode` 随产品发布的 preset（`apps/cli/config/agent-presets/dev-mode/`）提供四阶段 persona，并在常规编码工具集（shell、文件系统、jobs、skills、goals、plan mode、delegation、web）之外加载 `tool-dev-mode-pipeline`——与 `standard`／`code` preset 的结构相同。
 
 主机层划分：`dev-mode-pipeline` 挂载在 base bundle（`packages/bundle/base/cordis.patch.yml`）中，与 `agent-default-model` 并列，因此无论是否有任何会话挂载 `dev-mode` preset，其 settings 以及不依赖 RPC 的 `ctx.devModePipeline` 读写路径都始终存在——settings 页面不应依赖某个特定 preset 处于激活状态。`tool-dev-mode-pipeline` 则保留在 agent 层，只由 `dev-mode` preset 加载，因为它注册的工具若脱离该 preset 用来驱动各流水线阶段的 persona，便毫无意义。
 
-`planner` 环节的额外上下文无法像派生角色那样被拼接进去，因为 planner 本身**就是**主 Agent，并非本插件启动的对象——不存在可供拼接的提示词。为此存在 `devagent.get-context` 供主 Agent 主动调用，`dev-mode` persona 在 PLAN 阶段开始时会显式调用它并将结果并入。
+`planner` 环节的额外上下文无法像派生角色那样被拼接进去，因为 planner 本身**就是**主 Agent，并非本插件启动的对象——不存在可供拼接的提示词。为此存在 `devagent_get_context` 供主 Agent 主动调用，`dev-mode` persona 在 PLAN 阶段开始时会显式调用它并将结果并入。
 
 ## 已考虑的替代方案
 

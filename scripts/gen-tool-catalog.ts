@@ -475,8 +475,8 @@ const TOOL_PACKAGES: ToolPackage[] = [
     dir: 'tool-dev-mode-pipeline',
     source: 'packages/subagent/tool-dev-mode-pipeline/src/index.ts',
     requires: ['ctx.tools', 'ctx.devModePipeline', 'ctx.subagents'],
-    writes: ['tool/call', 'tool/result', 'child session events through the chosen provider (devagent.spawn only)'],
-    shippedNames: ['devagent.get-model', 'devagent.get-context', 'devagent.spawn'],
+    writes: ['tool/call', 'tool/result', 'child session events through the chosen provider (devagent_spawn only)'],
+    shippedNames: ['devagent_get_model', 'devagent_get_context', 'devagent_spawn'],
     async mount(ctx) {
       await ctx.plugin(AgentDefaultModelConfig, { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
       await ctx.plugin(DevModePipelineConfig)
@@ -485,7 +485,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolDevModePipeline, { provider: 'spawn' })
     },
     note:
-      'The three tools serve the `dev-mode` agent preset\'s four-stage pipeline. `devagent.spawn` starts one role subagent on the `ctx.subagents` provider configured for this plugin instance (default `spawn`), using the role\'s model configured in Settings > Development Mode when set, otherwise the session default; a configured extra context is prepended to the prompt.',
+      'The three tools serve the `dev-mode` agent preset\'s four-stage pipeline. `devagent_spawn` starts one role subagent on the `ctx.subagents` provider configured for this plugin instance (default `spawn`), using the role\'s model configured in Settings > Development Mode when set, otherwise the session default; a configured extra context is prepended to the prompt.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-subagent-control',

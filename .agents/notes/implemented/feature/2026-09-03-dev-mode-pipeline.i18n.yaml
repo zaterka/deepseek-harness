@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-03-dev-mode-pipeline.md
-2026-09-03-dev-mode-pipeline.md: bf719557a9a61dd1fd85bdebdf1a85fc4a780cb8
-2026-09-03-dev-mode-pipeline.zh.md: 4937634e9962ce574aafe5595498224dbc31c5e8
+2026-09-03-dev-mode-pipeline.md: 771776bc00568e097836be6e5419df89166bf364
+2026-09-03-dev-mode-pipeline.zh.md: 4d638655fbf32848441e4606b161da6364c8861e

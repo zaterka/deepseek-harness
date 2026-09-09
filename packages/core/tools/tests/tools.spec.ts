@@ -234,6 +234,28 @@ describe('ToolRuntime', () => {
       .toThrow('must declare output { schema, render, presentationMeta? }')
   })
 
+  it('rejects a tool name containing a character no routed provider accepts', async () => {
+    const ctx = await setup()
+    expect(() => ctx.tools.register(defineTool({
+      name: 'devagent.spawn',
+      description: 'dotted name',
+      parameters: {},
+      output: { schema: { type: 'json' }, render: () => [] },
+      execute: async () => null,
+    }))).toThrow('tool name "devagent.spawn" must match')
+  })
+
+  it('accepts every character the shared tool-name pattern allows', async () => {
+    const ctx = await setup()
+    expect(() => ctx.tools.register(defineTool({
+      name: 'devagent_spawn-v2',
+      description: 'underscore and hyphen',
+      parameters: {},
+      output: { schema: { type: 'json' }, render: () => [] },
+      execute: async () => null,
+    }))).not.toThrow()
+  })
+
   it('rejects lossy and schema-mismatched body values before post-execute', async () => {
     const ctx = await setup()
     ctx.tools.register(defineTool({

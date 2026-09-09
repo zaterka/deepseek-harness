@@ -38,7 +38,7 @@
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`、`ctx.agents`、`ctx.skills` | `tool/call`、`tool/result`、`user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`、`session_event_search`、`session_event_trace`、`session_search`、`session_trace` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionQuery`、`a calling Agent for workspace authority` | `tool/call`、`tool/result` | - | 这 5 个只读工具会隐藏提供方游标，并根据不可变的调用 agent 会话为每个结果授权。该包需要选择启用；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。 |
 | `@deepseek-ai/dsh-tool-subagent` | `subagent` | `ctx.tools`、`ctx.subagents`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`child session events through the chosen provider` | `subagent`、`subagent_fork` | 注册的工具名称取决于加载时 `toolName` 配置（默认为 `subagent`）；上述 schema 对应默认值。随产品发布的组合会为每个 subagent 后端加载一次该包，因此模型还会看到绑定到 fork 后端的 `subagent_fork`。每个实例的描述、`run_in_background` 参数与 system prompt 策略取决于它自己的 `backgroundMode` 和 `enableRunInBackground`，因此两个随附 schema 并不相同：`subagent` 为 `continuable`，省略参数时默认后台运行，并由 runtime 自动投递结束结果；`subagent_fork` 保持 `one-shot`，省略参数时默认前台运行。详见 `packages/bundle/base/cordis.patch.yml` 和 `examples/acp-agent/cordis.yml`。 |
-| `@deepseek-ai/dsh-tool-dev-mode-pipeline` | `devagent.get-context`、`devagent.get-model`、`devagent.spawn` | `ctx.tools`、`ctx.devModePipeline`、`ctx.subagents` | `tool/call`、`tool/result`、`child session events through the chosen provider (devagent.spawn only)` | `devagent.get-model`、`devagent.get-context`、`devagent.spawn` | 这三个工具服务于 `dev-mode` agent preset 的四阶段流水线。`devagent.spawn` 在为本插件实例配置的 `ctx.subagents` provider（默认 `spawn`）上启动一个角色子代理：已设置时使用该角色在 Settings > Development Mode 中配置的模型，否则使用会话默认模型；已配置的额外上下文会拼接到提示词之前。 |
+| `@deepseek-ai/dsh-tool-dev-mode-pipeline` | `devagent_get_context`、`devagent_get_model`、`devagent_spawn` | `ctx.tools`、`ctx.devModePipeline`、`ctx.subagents` | `tool/call`、`tool/result`、`child session events through the chosen provider (devagent_spawn only)` | `devagent_get_model`、`devagent_get_context`、`devagent_spawn` | 这三个工具服务于 `dev-mode` agent preset 的四阶段流水线。`devagent_spawn` 在为本插件实例配置的 `ctx.subagents` provider（默认 `spawn`）上启动一个角色子代理：已设置时使用该角色在 Settings > Development Mode 中配置的模型，否则使用会话默认模型；已配置的额外上下文会拼接到提示词之前。 |
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`、`list_agents`、`send_message` | `ctx.tools`、`ctx.subagents`、`ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`、`tool/result`、`child session events through ctx.subagents` | - | 这些是控制可继续后台 subagent 的全局命名工具：绑定提供方的 `tool-subagent` 实例注册不同的委派工具；本包注册一次 `send_message` 和 `interrupt_agent`，另由 `list_agents` 通过单独加载的 `/list-agents` 插件提供，其目录行使用 sessionProjections 和实时 Agent 注册表。 |
 | `@deepseek-ai/dsh-tool-subagent-report` | `report` | `ctx.subagents`、`ctx.systemPrompt`、`a live continuable in-process child Agent` | `tool/call`、`tool/result`、`a user-role message in the direct parent session` | - | 按可继续的进程内子级注册，而非全局注册，因此该 schema 仅在这种子级内部可见，并且不受其全局 `toolFilter` 影响。同一份贡献还会安装子级作用域的 `tool:report` 系统提示词 section，本目录不渲染该 section。面向父级的 `send_message` 工具单独安装。 |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
@@ -1544,9 +1544,9 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ## `@deepseek-ai/dsh-tool-dev-mode-pipeline`
 
-### `devagent.get-context`
+### `devagent_get_context`
 
-读取在 Settings > Development Mode 中为某个环节（`"planner"`、`"planReview"`、`"implement"` 或 `"codeReview"`）配置的额外 Development Mode 上下文。在相应流水线阶段开始时调用（尤其是 `"planner"`——因为它是主 agent 而非派生的子代理，本插件无法自行向其注入），并把返回的上下文并入该阶段的指令。`devagent.spawn` 已经在内部完成了角色上下文的解析与拼接。
+读取在 Settings > Development Mode 中为某个环节（`"planner"`、`"planReview"`、`"implement"` 或 `"codeReview"`）配置的额外 Development Mode 上下文。在相应流水线阶段开始时调用（尤其是 `"planner"`——因为它是主 agent 而非派生的子代理，本插件无法自行向其注入），并把返回的上下文并入该阶段的指令。`devagent_spawn` 已经在内部完成了角色上下文的解析与拼接。
 
 ```json
 {
@@ -1565,9 +1565,9 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 来源：[`packages/subagent/tool-dev-mode-pipeline/src/index.ts`](../packages/subagent/tool-dev-mode-pipeline/src/index.ts)
 
-### `devagent.get-model`
+### `devagent_get_model`
 
-读取为某个 Development Mode 流水线角色（`"planReview"`、`"implement"` 或 `"codeReview"`）配置的模型，返回其提供方与模型。在派生角色子代理之前调用，可确保派生使用该角色已配置的模型；`devagent.spawn` 已经在内部完成了这一解析，因此先调用本工具只是提示性的，并非必需。
+读取为某个 Development Mode 流水线角色（`"planReview"`、`"implement"` 或 `"codeReview"`）配置的模型，返回其提供方与模型。在派生角色子代理之前调用，可确保派生使用该角色已配置的模型；`devagent_spawn` 已经在内部完成了这一解析，因此先调用本工具只是提示性的，并非必需。
 
 ```json
 {
@@ -1586,7 +1586,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 来源：[`packages/subagent/tool-dev-mode-pipeline/src/index.ts`](../packages/subagent/tool-dev-mode-pipeline/src/index.ts)
 
-### `devagent.spawn`
+### `devagent_spawn`
 
 在其已配置的模型上，将一个 Development Mode 流水线角色作为一次性子代理启动，并把该角色（若有）已配置的额外上下文拼接到提示词之前。`role` 决定所用模型与上下文：`"planReview"` 对已写好的计划进行差距评审，`"implement"` 编写计划中某一部分的代码，`"codeReview"` 将生成的代码与原计划进行比对。返回该角色、解析得到的提供方／模型、该结果是否来自会话默认值，以及子代理的结束原因与文本输出。
 
@@ -1616,7 +1616,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 来源：[`packages/subagent/tool-dev-mode-pipeline/src/index.ts`](../packages/subagent/tool-dev-mode-pipeline/src/index.ts)
 
-这三个工具服务于 `dev-mode` agent preset 的四阶段流水线。`devagent.spawn` 在为本插件实例配置的 `ctx.subagents` provider（默认 `spawn`）上启动一个角色子代理：已设置时使用该角色在 Settings > Development Mode 中配置的模型，否则使用会话默认模型；已配置的额外上下文会拼接到提示词之前。
+这三个工具服务于 `dev-mode` agent preset 的四阶段流水线。`devagent_spawn` 在为本插件实例配置的 `ctx.subagents` provider（默认 `spawn`）上启动一个角色子代理：已设置时使用该角色在 Settings > Development Mode 中配置的模型，否则使用会话默认模型；已配置的额外上下文会拼接到提示词之前。
 
 <a id="deepseek-aidsh-tool-subagent-control"></a>
 
